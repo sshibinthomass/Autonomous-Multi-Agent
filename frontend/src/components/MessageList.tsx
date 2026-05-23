@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Message } from '../types';
+import { Markdown } from './Markdown';
 
 interface MessageListProps {
   messages: Message[];
@@ -25,7 +26,9 @@ export const MessageList: React.FC<MessageListProps> = ({
               }`}
             >
               <div className="avatar">{msg.role === 'user' ? 'U' : 'AI'}</div>
-              <div className="message-bubble">{msg.content}</div>
+              <div className="message-bubble">
+                <Markdown content={msg.content} />
+              </div>
             </div>
           );
         })}

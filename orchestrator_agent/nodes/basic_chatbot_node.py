@@ -10,7 +10,8 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from orchestrator_agent.states.chatbotState import ChatbotState
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, SystemMessage
+from orchestrator_agent.system_configuration import MAX_HISTORY_MESSAGES
 
 load_dotenv()
 
@@ -28,7 +29,17 @@ class BasicChatbotNode:
         Processes the input state and generates a chatbot response.
         Returns the AI response as an AIMessage object to maintain conversation history.
         """
-        response = self.llm.invoke(state["messages"])
+        messages = state.get("messages", [])
+        system_messages = [msg for msg in messages if isinstance(msg, SystemMessage)]
+        other_messages = [msg for msg in messages if not isinstance(msg, SystemMessage)]
+        
+        # Keep only the last MAX_HISTORY_MESSAGES messages
+        sliced_other = other_messages[-MAX_HISTORY_MESSAGES:]
+        
+        # Combine system messages (which control chatbot personality/settings) and the sliced messages
+        input_messages = system_messages + sliced_other
+
+        response = self.llm.invoke(input_messages)
 
         # Error handling for the response
         # If response is already an AIMessage, return it directly

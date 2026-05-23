@@ -358,6 +358,12 @@ body, html {
   font-weight: 600;
 }
 
+.chat-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .chat-header-actions {
   display: flex;
   align-items: center;
@@ -657,3 +663,402 @@ body, html {
     padding-right: 20px;
   }
 }
+
+/* Sessions Sidebar styling */
+.sessions-sidebar {
+  width: 320px;
+  height: 100%;
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sessions-sidebar.collapsed {
+  width: 0;
+  border-right-width: 0;
+}
+
+.sidebar-header {
+  padding: 24px 20px 16px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-top h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.close-sidebar-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.close-sidebar-btn:hover {
+  color: var(--text-main);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.new-chat-btn {
+  width: 100%;
+  padding: 12px;
+  background-color: transparent;
+  border: 1px dashed var(--border-color);
+  color: var(--text-main);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.new-chat-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background-color: var(--primary-glow);
+  box-shadow: 0 0 12px var(--primary-glow);
+}
+
+.sessions-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Custom Scrollbar for Sessions List */
+.sessions-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sessions-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sessions-list::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
+}
+
+.sessions-list::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+.empty-sessions {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.session-item {
+  padding: 12px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid transparent;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.session-item:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+  border-color: var(--border-color);
+}
+
+.session-item.active {
+  background-color: var(--bg-primary);
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.session-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.session-item-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-item.active .session-item-name {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.session-item-meta {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background-color: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+  align-self: flex-start;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-item.active .session-item-meta {
+  background-color: var(--primary-glow);
+  color: var(--primary);
+}
+
+.session-item-actions {
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  padding-left: 8px;
+}
+
+.session-item:hover .session-item-actions,
+.session-item.active .session-item-actions {
+  opacity: 1;
+}
+
+.session-action-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.session-action-btn:hover {
+  color: var(--text-main);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.session-action-btn.delete:hover {
+  color: var(--error);
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.rename-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.session-rename-input {
+  flex: 1;
+  padding: 6px 10px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  color: var(--text-main);
+  font-size: 0.85rem;
+  outline: none;
+  min-width: 0;
+}
+
+.rename-action-btn {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.rename-action-btn.save {
+  color: var(--success);
+}
+
+.rename-action-btn.save:hover {
+  background-color: rgba(16, 185, 129, 0.1);
+}
+
+.rename-action-btn.cancel {
+  color: var(--text-muted);
+}
+
+.rename-action-btn.cancel:hover {
+  color: var(--text-main);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Markdown Rendering Styles */
+.markdown-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.markdown-p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.markdown-content strong {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.user-row .markdown-content strong {
+  color: #ffffff;
+}
+
+.markdown-content em {
+  font-style: italic;
+}
+
+.inline-code {
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Fira Code', Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+  font-size: 0.85em;
+  color: #e2e8f0;
+}
+
+.user-row .inline-code {
+  background-color: rgba(0, 0, 0, 0.25);
+  color: #ffffff;
+}
+
+.chat-link {
+  color: #60a5fa;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.2s ease;
+}
+
+.user-row .chat-link {
+  color: #ffffff;
+}
+
+.chat-link:hover {
+  color: #93c5fd;
+}
+
+.markdown-ul, .markdown-ol {
+  margin: 0;
+  padding-left: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.markdown-li {
+  line-height: 1.5;
+}
+
+.markdown-blockquote {
+  margin: 0;
+  padding: 8px 16px;
+  border-left: 4px solid var(--primary);
+  background-color: rgba(255, 255, 255, 0.03);
+  border-radius: 0 8px 8px 0;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.markdown-code-wrapper {
+  background-color: #111216;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin: 8px 0;
+  overflow: hidden;
+}
+
+.user-row .markdown-code-wrapper {
+  background-color: rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.markdown-code-lang {
+  background-color: rgba(255, 255, 255, 0.03);
+  padding: 6px 14px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.user-row .markdown-code-lang {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.markdown-pre {
+  padding: 14px;
+  margin: 0;
+  overflow-x: auto;
+}
+
+.markdown-pre code {
+  font-family: 'Fira Code', Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #e2e8f0;
+}
+
+.user-row .markdown-pre code {
+  color: #ffffff;
+}
+
+.markdown-h1, .markdown-h2, .markdown-h3, .markdown-h4, .markdown-h5, .markdown-h6 {
+  margin: 8px 0 4px 0;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.markdown-h1 { font-size: 1.4rem; }
+.markdown-h2 { font-size: 1.25rem; }
+.markdown-h3 { font-size: 1.15rem; }
+.markdown-h4 { font-size: 1.05rem; }
+.markdown-h5 { font-size: 0.95rem; }
+.markdown-h6 { font-size: 0.85rem; }
+
+

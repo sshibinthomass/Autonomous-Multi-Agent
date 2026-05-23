@@ -17,7 +17,11 @@ class MockLLM:
     """
     A lightweight Mock LLM to test LangGraph memory operations without external API calls.
     """
+    def __init__(self):
+        self.invoked_messages = None
+
     def invoke(self, messages):
+        self.invoked_messages = messages
         last_msg = messages[-1].content
         return AIMessage(content=f"Echo: {last_msg}")
 
@@ -126,6 +130,44 @@ class TestBackendMemory(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state.values.get("model"), "gemini-2.5-flash")
         self.assertEqual(state.values.get("chatbot_name"), "Hal")
         self.assertEqual(state.values.get("tone"), "mature")
+
+    async def test_history_slicing_limit(self):
+        config = {"configurable": {"thread_id": self.thread_id}}
+        
+        # Write many messages to exceed MAX_HISTORY_MESSAGES limit
+        from orchestrator_agent.system_configuration import MAX_HISTORY_MESSAGES
+        
+        # We will create a history with 1 system message and 30 user/assistant messages
+        system_msg = SystemMessage(content="System prompt instructions")
+        messages = [system_msg]
+        
+        for i in range(15):
+            messages.append(HumanMessage(content=f"User msg {i}"))
+            messages.append(AIMessage(content=f"AI msg {i}"))
+            
+        await self.graph.aupdate_state(config, {
+            "messages": messages
+        })
+        
+        # Now run another message through the graph to trigger node invocation
+        next_msg = ChatMessage(role="user", content="Next user message")
+        await self.graph.ainvoke({"messages": to_langchain_messages([next_msg])}, config)
+        
+        # Check what messages were actually passed to the LLM
+        invoked = self.llm.invoked_messages
+        
+        # The total non-system messages passed should be limited to MAX_HISTORY_MESSAGES
+        # plus the system message(s)
+        self.assertIsNotNone(invoked)
+        
+        non_system_invoked = [m for m in invoked if not isinstance(m, SystemMessage)]
+        system_invoked = [m for m in invoked if isinstance(m, SystemMessage)]
+        
+        self.assertEqual(len(system_invoked), 1)
+        self.assertEqual(system_invoked[0].content, "System prompt instructions")
+        self.assertEqual(len(non_system_invoked), MAX_HISTORY_MESSAGES)
+        # The very last message in the invoked list should be our new message
+        self.assertEqual(non_system_invoked[-1].content, "Next user message")
 
 if __name__ == "__main__":
     unittest.main()

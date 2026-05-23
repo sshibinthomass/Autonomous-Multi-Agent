@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 class ChatMessage(BaseModel):
     """
@@ -43,3 +43,28 @@ class SettingsResponse(BaseModel):
     so the frontend UI can render select menus.
     """
     providers: Dict[str, ProviderDetail]  # Map of provider names to their details
+
+class CreateSessionRequest(BaseModel):
+    """
+    Represents the request parameters required to create a new session.
+    """
+    provider: str
+    model: str
+    chatbot_name: str = "Jarvis"
+    tone: str = "friendly"
+
+class RenameSessionRequest(BaseModel):
+    """
+    Represents the request payload for renaming a session.
+    """
+    name: str
+
+class UpdateSettingsRequest(BaseModel):
+    """
+    Represents the optional request fields for updating an active session's settings.
+    """
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    chatbot_name: Optional[str] = None
+    tone: Optional[str] = None
+

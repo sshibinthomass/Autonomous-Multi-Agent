@@ -5,6 +5,8 @@ interface ChatHeaderProps {
   selectedModel: string;
   isModalOpen: boolean;
   onToggleModal: () => void;
+  isSessionsSidebarOpen: boolean;
+  onToggleSessionsSidebar: () => void;
 }
 
 export const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -12,10 +14,36 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   selectedModel,
   isModalOpen,
   onToggleModal,
+  isSessionsSidebarOpen,
+  onToggleSessionsSidebar,
 }) => {
   return (
     <header className="chat-header">
-      <h1>Autonomous Agent Playground</h1>
+      <div className="chat-header-left">
+        {/* Toggle Sessions Sidebar button */}
+        <button
+          className={`sidebar-toggle-btn ${isSessionsSidebarOpen ? 'active' : ''}`}
+          onClick={onToggleSessionsSidebar}
+          aria-label="Toggle Sessions"
+          title="Toggle Sessions"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ width: '20px', height: '20px' }}
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="9" y1="3" x2="9" y2="21"></line>
+          </svg>
+        </button>
+        <h1>Autonomous Agent Playground</h1>
+      </div>
+      
       <div className="chat-header-actions">
         <div className="status-indicator">
           <span className="dot active"></span>
@@ -24,6 +52,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
             {selectedProvider.toUpperCase()} / {selectedModel}
           </strong>
         </div>
+
+        {/* Toggle Settings Modal button */}
         <button
           className={`sidebar-toggle-btn ${isModalOpen ? 'active' : ''}`}
           onClick={onToggleModal}

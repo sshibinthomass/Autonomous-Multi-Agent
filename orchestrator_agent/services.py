@@ -97,37 +97,55 @@ async def execute_chatbot_graph(messages: List[ChatMessage], provider: str, mode
     chatbot_name = prompt_config.get("chatbot_name", "Jarvis")
     tone = prompt_config.get("tone", "friendly")
 
+    # Load session settings from disk if they exist to preserve individual session config
+    from orchestrator_agent.session_manager import load_session
+    session = load_session(thread_id)
+    if session:
+        chatbot_name = session.get("chatbot_name", chatbot_name)
+        tone = session.get("tone", tone)
+        provider = session.get("provider", provider)
+        model = session.get("model", model)
+
     # 1. Instantiate the target LLM
     llm = get_base_llm(provider, model)
-    print("LLM Provider-",llm)
     # 2. Build and compile the graph
     builder = GraphBuilder(model=llm)
     graph = await builder.setup_graph("basic_chatbot")
     
-    config = {"configurable": {"thread_id": thread_id}}
+    config = {
+        "configurable": {"thread_id": thread_id},
+        "metadata": {
+            "provider": provider,
+            "model": model,
+            "chatbot_name": chatbot_name,
+            "tone": tone
+        },
+        "tags": [provider, model, tone]
+    }
     
     # 3. Check for existing messages in state
     state = await graph.aget_state(config)
     existing_messages = state.values.get("messages", [])
     
-    # Check if we need to dynamically update the system prompt in the checkpointer
-    saved_chatbot_name = state.values.get("chatbot_name")
-    saved_tone = state.values.get("tone")
-    if existing_messages and (saved_chatbot_name != chatbot_name or saved_tone != tone):
-        for msg in existing_messages:
-            if isinstance(msg, SystemMessage):
-                new_prompt = get_basic_chatbot_system_prompt(name=chatbot_name, tone=tone)
-                msg.content = new_prompt
-                await graph.aupdate_state(config, {
-                    "messages": [msg],
-                    "chatbot_name": chatbot_name,
-                    "tone": tone
-                })
-                break
-        # Reload state to get updated messages
-        state = await graph.aget_state(config)
-        existing_messages = state.values.get("messages", [])
-
+    # Seed checkpointer from session JSON if memory is empty
+    if not existing_messages:
+        from orchestrator_agent.session_manager import load_session
+        session = load_session(thread_id)
+        if session:
+            seeded_messages = to_langchain_messages([
+                ChatMessage(role=m["role"], content=m["content"])
+                for m in session.get("messages", [])
+            ])
+            await graph.aupdate_state(config, {
+                "messages": seeded_messages,
+                "provider": session.get("provider", provider),
+                "model": session.get("model", model),
+                "chatbot_name": session.get("chatbot_name", chatbot_name),
+                "tone": session.get("tone", tone)
+            })
+            # Reload state
+            state = await graph.aget_state(config)
+            existing_messages = state.values.get("messages", [])
     
     # 4. Prepare new messages
     langchain_messages = to_langchain_messages(messages)
@@ -152,6 +170,34 @@ async def execute_chatbot_graph(messages: List[ChatMessage], provider: str, mode
     updated_state = await graph.aget_state(config)
     all_messages = updated_state.values.get("messages", [])
     
+    # Save/update session on disk
+    from orchestrator_agent.session_manager import load_session, save_session
+    existing_session = load_session(thread_id)
+    
+    if existing_session and existing_session.get("name") != "New Chat":
+        name = existing_session.get("name")
+        created_at = existing_session.get("created_at")
+    else:
+        # Generate name from first user message
+        user_messages = [m for m in all_messages if isinstance(m, HumanMessage)]
+        if user_messages:
+            first_content = user_messages[0].content
+            name = first_content[:40] + ("..." if len(first_content) > 40 else "")
+        else:
+            name = "New Chat"
+        created_at = existing_session.get("created_at") if existing_session else None
+        
+    save_session(
+        thread_id=thread_id,
+        name=name,
+        messages=[to_chat_dict(m) for m in all_messages],
+        provider=provider,
+        model=model,
+        chatbot_name=chatbot_name,
+        tone=tone,
+        created_at=created_at
+    )
+    
     return {
         "messages": [to_chat_dict(m) for m in all_messages],
         "settings": {
@@ -172,6 +218,15 @@ async def get_chatbot_history(provider: str, model: str, thread_id: str = "defau
     chatbot_name = prompt_config.get("chatbot_name", "Jarvis")
     tone = prompt_config.get("tone", "friendly")
 
+    # Load session settings from disk if they exist to preserve individual session config
+    from orchestrator_agent.session_manager import load_session
+    session = load_session(thread_id)
+    if session:
+        chatbot_name = session.get("chatbot_name", chatbot_name)
+        tone = session.get("tone", tone)
+        provider = session.get("provider", provider)
+        model = session.get("model", model)
+
     # A. Compile with default parameters to pull the initial state snapshot
     llm = get_base_llm(provider, model)
     builder = GraphBuilder(model=llm)
@@ -179,7 +234,50 @@ async def get_chatbot_history(provider: str, model: str, thread_id: str = "defau
     config = {"configurable": {"thread_id": thread_id}}
     
     state = await graph.aget_state(config)
+    messages = state.values.get("messages", [])
     
+    # Load from JSON if checkpointer is empty (e.g. server restarted)
+    if not messages:
+        from orchestrator_agent.session_manager import load_session, save_session
+        session = load_session(thread_id)
+        if session:
+            msgs_to_seed = to_langchain_messages([
+                ChatMessage(role=m["role"], content=m["content"])
+                for m in session.get("messages", [])
+            ])
+            await graph.aupdate_state(config, {
+                "messages": msgs_to_seed,
+                "provider": session.get("provider", provider),
+                "model": session.get("model", model),
+                "chatbot_name": session.get("chatbot_name", chatbot_name),
+                "tone": session.get("tone", tone)
+            })
+            state = await graph.aget_state(config)
+            messages = state.values.get("messages", [])
+        else:
+            # Initialize system message in state & disk
+            prompt = get_basic_chatbot_system_prompt(name=chatbot_name, tone=tone)
+            system_msg = SystemMessage(content=prompt)
+            await graph.aupdate_state(config, {
+                "messages": [system_msg],
+                "provider": provider,
+                "model": model,
+                "chatbot_name": chatbot_name,
+                "tone": tone
+            })
+            state = await graph.aget_state(config)
+            messages = [system_msg]
+            
+            save_session(
+                thread_id=thread_id,
+                name="New Chat",
+                messages=[to_chat_dict(system_msg)],
+                provider=provider,
+                model=model,
+                chatbot_name=chatbot_name,
+                tone=tone
+            )
+            
     # B. If thread was previously active and has saved settings, dynamically reload/compile with those settings!
     saved_provider = state.values.get("provider")
     saved_model = state.values.get("model")
@@ -188,9 +286,8 @@ async def get_chatbot_history(provider: str, model: str, thread_id: str = "defau
         builder = GraphBuilder(model=llm)
         graph = await builder.setup_graph("basic_chatbot")
         state = await graph.aget_state(config)
+        messages = state.values.get("messages", [])
         
-    messages = state.values.get("messages", [])
-    
     # Check if we need to dynamically update the system prompt in the checkpointer
     saved_chatbot_name = state.values.get("chatbot_name")
     saved_tone = state.values.get("tone")
@@ -208,19 +305,22 @@ async def get_chatbot_history(provider: str, model: str, thread_id: str = "defau
         # Reload state to fetch the updated messages
         state = await graph.aget_state(config)
         messages = state.values.get("messages", [])
-    
-    if not messages:
-        prompt = get_basic_chatbot_system_prompt(name=chatbot_name, tone=tone)
-        system_msg = SystemMessage(content=prompt)
-        await graph.aupdate_state(config, {
-            "messages": [system_msg],
-            "provider": provider,
-            "model": model,
-            "chatbot_name": chatbot_name,
-            "tone": tone
-        })
-        state = await graph.aget_state(config)
-        messages = [system_msg]
+        
+        # Keep JSON file in sync with system prompt update
+        from orchestrator_agent.session_manager import load_session, save_session
+        existing_session = load_session(thread_id)
+        name = existing_session.get("name", "New Chat") if existing_session else "New Chat"
+        created_at = existing_session.get("created_at") if existing_session else None
+        save_session(
+            thread_id=thread_id,
+            name=name,
+            messages=[to_chat_dict(m) for m in messages],
+            provider=state.values.get("provider", provider),
+            model=state.values.get("model", model),
+            chatbot_name=chatbot_name,
+            tone=tone,
+            created_at=created_at
+        )
         
     return {
         "messages": [to_chat_dict(m) for m in messages],
@@ -234,6 +334,10 @@ async def get_chatbot_history(provider: str, model: str, thread_id: str = "defau
 
 def clear_chatbot_history(thread_id: str) -> None:
     """
-    Removes a thread and its message history from memory checkpointer storage.
+    Removes a thread and its message history from memory checkpointer storage and disk.
     """
     memory_checkpointer.storage.pop(thread_id, None)
+    
+    from orchestrator_agent.session_manager import delete_session
+    delete_session(thread_id)
+
