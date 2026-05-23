@@ -106,5 +106,26 @@ class TestBackendMemory(unittest.IsolatedAsyncioTestCase):
         cleared_state = await self.graph.aget_state(config)
         self.assertEqual(cleared_state.values, {})
 
+    async def test_settings_persistence_in_graph_state(self):
+        config = {"configurable": {"thread_id": self.thread_id}}
+        
+        # Write messages and settings to the graph state
+        await self.graph.aupdate_state(config, {
+            "messages": [SystemMessage(content="Hello")],
+            "provider": "gemini",
+            "model": "gemini-2.5-flash",
+            "chatbot_name": "Hal",
+            "tone": "mature"
+        })
+        
+        # Load state snapshot
+        state = await self.graph.aget_state(config)
+        
+        # Verify all settings are preserved correctly in the checkpointer
+        self.assertEqual(state.values.get("provider"), "gemini")
+        self.assertEqual(state.values.get("model"), "gemini-2.5-flash")
+        self.assertEqual(state.values.get("chatbot_name"), "Hal")
+        self.assertEqual(state.values.get("tone"), "mature")
+
 if __name__ == "__main__":
     unittest.main()

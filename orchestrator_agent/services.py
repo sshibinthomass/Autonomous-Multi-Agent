@@ -13,6 +13,7 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from orchestrator_agent.graphs.graph_builder import GraphBuilder, memory_checkpointer
 from orchestrator_agent.config import get_env_variable
 from orchestrator_agent.schemas import ChatMessage
+from orchestrator_agent.prompts.prompts import get_basic_chatbot_system_prompt
 
 # Import LLM wrappers
 from orchestrator_agent.llms.openai_llm import OpenAILLM
@@ -86,14 +87,19 @@ def to_langchain_messages(messages: List[ChatMessage]):
             converted.append(HumanMessage(content=msg.content))
     return converted
 
-async def execute_chatbot_graph(messages: List[ChatMessage], provider: str, model: str, thread_id: str = "default") -> List[dict]:
+async def execute_chatbot_graph(messages: List[ChatMessage], provider: str, model: str, thread_id: str = "default", prompt_config: dict = None) -> dict:
     """
     Initializes the required base LLM, compiles the basic chatbot StateGraph,
-    runs it asynchronously using ainvoke with a checkpointer, and returns the full message history.
+    runs it asynchronously using ainvoke with a checkpointer, and returns the full message history and settings.
     """
+    if prompt_config is None:
+        prompt_config = {}
+    chatbot_name = prompt_config.get("chatbot_name", "Jarvis")
+    tone = prompt_config.get("tone", "friendly")
+
     # 1. Instantiate the target LLM
     llm = get_base_llm(provider, model)
-    
+    print("LLM Provider-",llm)
     # 2. Build and compile the graph
     builder = GraphBuilder(model=llm)
     graph = await builder.setup_graph("basic_chatbot")
@@ -104,41 +110,127 @@ async def execute_chatbot_graph(messages: List[ChatMessage], provider: str, mode
     state = await graph.aget_state(config)
     existing_messages = state.values.get("messages", [])
     
+    # Check if we need to dynamically update the system prompt in the checkpointer
+    saved_chatbot_name = state.values.get("chatbot_name")
+    saved_tone = state.values.get("tone")
+    if existing_messages and (saved_chatbot_name != chatbot_name or saved_tone != tone):
+        for msg in existing_messages:
+            if isinstance(msg, SystemMessage):
+                new_prompt = get_basic_chatbot_system_prompt(name=chatbot_name, tone=tone)
+                msg.content = new_prompt
+                await graph.aupdate_state(config, {
+                    "messages": [msg],
+                    "chatbot_name": chatbot_name,
+                    "tone": tone
+                })
+                break
+        # Reload state to get updated messages
+        state = await graph.aget_state(config)
+        existing_messages = state.values.get("messages", [])
+
+    
     # 4. Prepare new messages
     langchain_messages = to_langchain_messages(messages)
     if not existing_messages:
         # If thread is empty, prepend a default system prompt if not already present
         if not any(isinstance(m, SystemMessage) for m in langchain_messages):
-            langchain_messages.insert(0, SystemMessage(content="You are a helpful and efficient assistant."))
+            prompt = get_basic_chatbot_system_prompt(name=chatbot_name, tone=tone)
+            langchain_messages.insert(0, SystemMessage(content=prompt))
             
     # 5. Execute state graph asynchronously
     await graph.ainvoke({"messages": langchain_messages}, config)
     
-    # 6. Retrieve full updated messages state
+    # 6. Save current settings in state checkpoint
+    await graph.aupdate_state(config, {
+        "provider": provider,
+        "model": model,
+        "chatbot_name": chatbot_name,
+        "tone": tone
+    })
+    
+    # 7. Retrieve full updated messages and settings state
     updated_state = await graph.aget_state(config)
     all_messages = updated_state.values.get("messages", [])
     
-    return [to_chat_dict(m) for m in all_messages]
+    return {
+        "messages": [to_chat_dict(m) for m in all_messages],
+        "settings": {
+            "provider": updated_state.values.get("provider", provider),
+            "model": updated_state.values.get("model", model),
+            "chatbot_name": updated_state.values.get("chatbot_name", chatbot_name),
+            "tone": updated_state.values.get("tone", tone)
+        }
+    }
 
-async def get_chatbot_history(provider: str, model: str, thread_id: str = "default") -> List[dict]:
+async def get_chatbot_history(provider: str, model: str, thread_id: str = "default", prompt_config: dict = None) -> dict:
     """
-    Retrieves the full conversation history for a thread.
-    If it doesn't exist, initializes it with a default system message.
+    Retrieves the full conversation history and saved settings for a thread.
+    If it doesn't exist, initializes it with a default system message and settings.
     """
+    if prompt_config is None:
+        prompt_config = {}
+    chatbot_name = prompt_config.get("chatbot_name", "Jarvis")
+    tone = prompt_config.get("tone", "friendly")
+
+    # A. Compile with default parameters to pull the initial state snapshot
     llm = get_base_llm(provider, model)
     builder = GraphBuilder(model=llm)
     graph = await builder.setup_graph("basic_chatbot")
     config = {"configurable": {"thread_id": thread_id}}
     
     state = await graph.aget_state(config)
+    
+    # B. If thread was previously active and has saved settings, dynamically reload/compile with those settings!
+    saved_provider = state.values.get("provider")
+    saved_model = state.values.get("model")
+    if saved_provider and saved_model and (saved_provider != provider or saved_model != model):
+        llm = get_base_llm(saved_provider, saved_model)
+        builder = GraphBuilder(model=llm)
+        graph = await builder.setup_graph("basic_chatbot")
+        state = await graph.aget_state(config)
+        
     messages = state.values.get("messages", [])
     
+    # Check if we need to dynamically update the system prompt in the checkpointer
+    saved_chatbot_name = state.values.get("chatbot_name")
+    saved_tone = state.values.get("tone")
+    if messages and (saved_chatbot_name != chatbot_name or saved_tone != tone):
+        for msg in messages:
+            if isinstance(msg, SystemMessage):
+                new_prompt = get_basic_chatbot_system_prompt(name=chatbot_name, tone=tone)
+                msg.content = new_prompt
+                await graph.aupdate_state(config, {
+                    "messages": [msg],
+                    "chatbot_name": chatbot_name,
+                    "tone": tone
+                })
+                break
+        # Reload state to fetch the updated messages
+        state = await graph.aget_state(config)
+        messages = state.values.get("messages", [])
+    
     if not messages:
-        system_msg = SystemMessage(content="You are a helpful and efficient assistant.")
-        await graph.aupdate_state(config, {"messages": [system_msg]})
+        prompt = get_basic_chatbot_system_prompt(name=chatbot_name, tone=tone)
+        system_msg = SystemMessage(content=prompt)
+        await graph.aupdate_state(config, {
+            "messages": [system_msg],
+            "provider": provider,
+            "model": model,
+            "chatbot_name": chatbot_name,
+            "tone": tone
+        })
+        state = await graph.aget_state(config)
         messages = [system_msg]
         
-    return [to_chat_dict(m) for m in messages]
+    return {
+        "messages": [to_chat_dict(m) for m in messages],
+        "settings": {
+            "provider": state.values.get("provider", provider),
+            "model": state.values.get("model", model),
+            "chatbot_name": state.values.get("chatbot_name", chatbot_name),
+            "tone": state.values.get("tone", tone)
+        }
+    }
 
 def clear_chatbot_history(thread_id: str) -> None:
     """

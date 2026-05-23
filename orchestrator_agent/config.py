@@ -16,3 +16,7 @@ AVAILABLE_MODELS = {
 def get_env_variable(name: str, default: str = "") -> str:
     """Reads environment variables from current process space."""
     return os.getenv(name, default)
+
+
+# Prompt Configuration
+TONES = ["friendly","professional","mature"]

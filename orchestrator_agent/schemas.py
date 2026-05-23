@@ -10,6 +10,13 @@ class ChatMessage(BaseModel):
     role: str  # Dictates who sent the message: 'user', 'assistant', or 'system'
     content: str  # The actual text payload of the message
 
+class PromptConfig(BaseModel):
+    """
+    Groups configurations relating to the agent's system prompt guidelines.
+    """
+    chatbot_name: str = "Jarvis"  # Custom assistant name (default: Jarvis)
+    tone: str = "friendly"  # Conversational tone: friendly, mature, professional
+
 class ChatRequest(BaseModel):
     """
     Represents the main request payload for the `/api/chat` endpoint.
@@ -17,6 +24,7 @@ class ChatRequest(BaseModel):
     selected a supported provider, and picked a specific model name.
     """
     thread_id: str = "default"  # To identify the chat session in the backend
+    prompt_config: PromptConfig = PromptConfig()  # Centralized prompt configuration variables
     messages: List[ChatMessage]  # The new message(s) to send (usually just the latest user message)
     provider: str  # The target engine provider: 'openai', 'gemini', 'groq', 'anthropic', 'ollama'
     model: str  # The specific model string (e.g. 'gpt-4o-mini', 'gemini-2.5-flash')
