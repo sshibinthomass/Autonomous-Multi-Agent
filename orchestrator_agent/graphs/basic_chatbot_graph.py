@@ -8,7 +8,7 @@ project_root = current_file.parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from langgraph_agent.nodes.basic_chatbot_node import BasicChatbotNode
+from orchestrator_agent.nodes.basic_chatbot_node import BasicChatbotNode
 
 
 def basic_chatbot_build_graph(graph_builder, llm):
