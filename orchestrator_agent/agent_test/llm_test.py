@@ -6,16 +6,8 @@ import dotenv
 
 dotenv.load_dotenv()
 
-print("cwd:", Path.cwd())
-print("python:", sys.executable)
 
-project_root_value = os.getenv("PROJECT_ROOT", "")
-if project_root_value:
-    repo_root = Path(project_root_value).expanduser().resolve()
-elif "__file__" in globals():
-    repo_root = Path(__file__).resolve().parent.parent.parent
-else:
-    repo_root = Path.cwd()
+repo_root = Path(__file__).resolve().parent.parent.parent
 
 sys.path.insert(0, str(repo_root))
 
