@@ -29,9 +29,12 @@ Autonomous-Multi-Agent/
 ├── frontend/                  # React 19 + TypeScript + Vite Client App
 │   ├── src/
 │   │   ├── main.tsx           # Application entry point
-│   │   ├── App.tsx            # Central chat panel and state container
+│   │   ├── App.tsx            # Master application state orchestrator
 │   │   ├── App.css            # Custom HSL-based styles & animations
-│   │   └── index.css          # CSS reset guidelines
+│   │   ├── index.css          # CSS reset guidelines
+│   │   ├── types.ts           # Centralized TypeScript interface declarations
+│   │   ├── components/        # Isolated sub-components (Header, MessageList, ChatInput, SettingsModal)
+│   │   └── utils/             # Helper modules (storage persistence)
 │   └── package.json           # Frontend dependency manifest
 │
 ├── orchestrator_agent/        # FastAPI Python Backend
@@ -46,12 +49,17 @@ Autonomous-Multi-Agent/
 │   │   └── basic_chatbot_graph.py # Node-Edge graph layout
 │   ├── nodes/
 │   │   └── basic_chatbot_node.py  # LLM execution node wrapper
-│   └── llms/                  # Decoupled provider-specific LLM adapters
-│       ├── openai_llm.py
-│       ├── gemini_llm.py
-│       ├── groq_llm.py
-│       ├── anthropic_llm.py
-│       └── ollama_llm.py
+│   ├── llms/                  # Decoupled provider-specific LLM adapters
+│   │   ├── openai_llm.py
+│   │   ├── gemini_llm.py
+│   │   ├── groq_llm.py
+│   │   ├── anthropic_llm.py
+│   │   └── ollama_llm.py
+│   ├── prompts/
+│   │   └── prompts.py         # Dynamic tone and name voice prompt builder
+│   ├── tools/                 # Setup hooks for custom local tool wrappers
+│   ├── stores/                # Checkpointer backend storage connectors
+│   └── mcps/                  # Setup hooks for Model Context Protocol systems
 │
 ├── example.env                # Standard template for credential setup
 ├── pyproject.toml             # Python build dependencies & project meta

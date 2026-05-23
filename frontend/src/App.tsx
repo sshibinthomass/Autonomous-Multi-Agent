@@ -1,69 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
-
-interface Message {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-}
-
-interface ProviderInfo {
-  models: string[];
-}
-
-interface SettingsResponse {
-  providers: {
-    [key: string]: ProviderInfo;
-  };
-  tones: string[];
-}
-
-// Mirrors the backend's PromptConfig (schemas.py)
-interface PromptConfig {
-  chatbot_name: string;
-  tone: string;
-}
-
-// ── localStorage helpers ──────────────────────────────────────────────
-// Using localStorage (not sessionStorage) so values survive tab close,
-// browser restart, and backend restarts.
-const STORAGE_KEYS = {
-  threadId: 'agent_thread_id',
-  provider: 'agent_provider',
-  model: 'agent_model',
-  promptConfig: 'agent_prompt_config',
-} as const;
-
-const DEFAULT_PROMPT_CONFIG: PromptConfig = {
-  chatbot_name: 'Jarvis',
-  tone: 'friendly',
-};
-
-function loadSetting(key: string, fallback: string): string {
-  return localStorage.getItem(key) || fallback;
-}
-
-function saveSetting(key: string, value: string): void {
-  localStorage.setItem(key, value);
-}
-
-function loadPromptConfig(): PromptConfig {
-  const raw = localStorage.getItem(STORAGE_KEYS.promptConfig);
-  if (raw) {
-    try {
-      return { ...DEFAULT_PROMPT_CONFIG, ...JSON.parse(raw) };
-    } catch { /* corrupted JSON, fall through */ }
-  }
-  return { ...DEFAULT_PROMPT_CONFIG };
-}
-
-function savePromptConfig(config: PromptConfig): void {
-  localStorage.setItem(STORAGE_KEYS.promptConfig, JSON.stringify(config));
-}
+import type { Message, ProviderInfo, SettingsResponse, PromptConfig } from './types';
+import {
+  STORAGE_KEYS,
+  loadSetting,
+  saveSetting,
+  loadPromptConfig,
+  savePromptConfig,
+} from './utils/storage';
+import { ChatHeader } from './components/ChatHeader';
+import { MessageList } from './components/MessageList';
+import { ChatInput } from './components/ChatInput';
+import { SettingsModal } from './components/SettingsModal';
 
 function App() {
   // ── Modal Popup Open/Closed state ───────────────────────────────────
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'agent' | 'prompt'>('agent');
 
   const toggleModal = useCallback(() => {
     setIsModalOpen(prev => !prev);
@@ -102,19 +54,7 @@ function App() {
   // Prompt configuration as a single dict — mirrors backend PromptConfig
   const [promptConfig, setPromptConfig] = useState<PromptConfig>(loadPromptConfig);
 
-  // Staging state for prompt configuration
-  const [tempPromptConfig, setTempPromptConfig] = useState<PromptConfig>(DEFAULT_PROMPT_CONFIG);
-  const [isSavedSuccessfully, setIsSavedSuccessfully] = useState<boolean>(false);
-
-  // Synchronise temporary prompt config when modal opens
-  useEffect(() => {
-    if (isModalOpen) {
-      setTempPromptConfig(promptConfig);
-      setIsSavedSuccessfully(false);
-    }
-  }, [isModalOpen, promptConfig]);
-
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   // ── Wrapped setters that always persist to localStorage ────────────
   const updateProvider = useCallback((value: string) => {
@@ -277,30 +217,22 @@ function App() {
     }
   };
 
+  // ── Save prompt config and dynamic update ─────────────────────────
+  const handlePromptConfigSave = async (newConfig: PromptConfig) => {
+    updatePromptConfig(newConfig);
+    await fetchHistory(newConfig);
+  };
+
   return (
     <div className="app-container">
       {/* Main Chat Interface */}
       <main className="chat-main">
-        <header className="chat-header">
-          <h1>Autonomous Agent Playground</h1>
-          <div className="chat-header-actions">
-            <div className="status-indicator">
-              <span className="dot active"></span>
-              Active Model: <strong style={{ marginLeft: '4px' }}>{selectedProvider.toUpperCase()} / {selectedModel}</strong>
-            </div>
-            <button 
-              className={`sidebar-toggle-btn ${isModalOpen ? 'active' : ''}`}
-              onClick={toggleModal}
-              aria-label="Open Settings"
-              title="Open Settings"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-gear">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-              </svg>
-            </button>
-          </div>
-        </header>
+        <ChatHeader
+          selectedProvider={selectedProvider}
+          selectedModel={selectedModel}
+          isModalOpen={isModalOpen}
+          onToggleModal={toggleModal}
+        />
 
         {/* Error banner */}
         {errorMsg && (
@@ -311,203 +243,38 @@ function App() {
         )}
 
         {/* Chat message history container */}
-        <div className="messages-container">
-          {messages
-            .filter(msg => msg.role !== 'system')
-            .map((msg, index) => {
-              return (
-                <div 
-                  key={index} 
-                  className={`message-row ${msg.role === 'user' ? 'user-row' : 'bot-row'}`}
-                >
-                  <div className="avatar">
-                    {msg.role === 'user' ? 'U' : 'AI'}
-                  </div>
-                  <div className="message-bubble">
-                    {msg.content}
-                  </div>
-                </div>
-              );
-            })}
-          
-          {/* Loading Indicator */}
-          {isLoading && (
-            <div className="message-row bot-row">
-              <div className="avatar">AI</div>
-              <div className="message-bubble loading-bubble">
-                <div className="typing-dots">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <div ref={chatEndRef} />
-        </div>
+        <MessageList
+          messages={messages}
+          isLoading={isLoading}
+          chatEndRef={chatEndRef}
+        />
 
         {/* Message Input Box */}
-        <footer className="chat-input-footer">
-          <form onSubmit={handleSendMessage} className="input-form">
-            <input
-              type="text"
-              placeholder={`Send a message to the ${selectedModel} assistant...`}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              disabled={isLoading}
-            />
-            <button type="submit" disabled={!inputValue.trim() || isLoading}>
-              {isLoading ? 'Sending...' : 'Send'}
-            </button>
-          </form>
-        </footer>
+        <ChatInput
+          inputValue={inputValue}
+          onInputChange={setInputValue}
+          onSend={handleSendMessage}
+          isLoading={isLoading}
+          placeholder={`Send a message to the ${selectedModel} assistant...`}
+        />
       </main>
 
-      {/* Modal Popup & Backdrop Overlay */}
-      {isModalOpen && (
-        <div className="modal-backdrop" onClick={toggleModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Agent Settings</h2>
-              <button 
-                type="button"
-                className="modal-close-btn"
-                onClick={toggleModal}
-                aria-label="Close"
-                title="Close Settings"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-close">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            </div>
-
-            {/* Tab selection switcher */}
-            <div className="modal-tabs">
-              <button 
-                type="button"
-                className={`tab-btn ${activeTab === 'agent' ? 'active' : ''}`}
-                onClick={() => setActiveTab('agent')}
-              >
-                Agent Configuration
-              </button>
-              <button 
-                type="button"
-                className={`tab-btn ${activeTab === 'prompt' ? 'active' : ''}`}
-                onClick={() => setActiveTab('prompt')}
-              >
-                Prompt Configuration
-              </button>
-            </div>
-
-            <div className="modal-body">
-              {activeTab === 'agent' && (
-                <div className="tab-pane">
-                  <div className="setting-group">
-                    <label>Provider</label>
-                    <select 
-                      value={selectedProvider} 
-                      onChange={(e) => updateProvider(e.target.value)}
-                    >
-                      {Object.keys(providers).map(p => (
-                        <option key={p} value={p}>
-                          {p.toUpperCase()}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="setting-group">
-                    <label>Model</label>
-                    <select 
-                      value={selectedModel} 
-                      onChange={(e) => updateModel(e.target.value)}
-                    >
-                      {providers[selectedProvider]?.models.map(m => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'prompt' && (
-                <div className="tab-pane">
-                  <div className="setting-group">
-                    <label>Chatbot Name</label>
-                    <input 
-                      type="text" 
-                      value={tempPromptConfig.chatbot_name} 
-                      onChange={(e) => setTempPromptConfig(prev => ({ ...prev, chatbot_name: e.target.value }))}
-                      placeholder="e.g. Jarvis"
-                      className="name-input"
-                    />
-                  </div>
-
-                  <div className="setting-group">
-                    <label>Assistant Tone</label>
-                    <select 
-                      value={tempPromptConfig.tone} 
-                      onChange={(e) => setTempPromptConfig(prev => ({ ...prev, tone: e.target.value }))}
-                    >
-                      {availableTones.map(t => (
-                        <option key={t} value={t}>
-                          {t.charAt(0).toUpperCase() + t.slice(1)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="save-action-row">
-                    <button 
-                      type="button" 
-                      className="prompt-save-btn"
-                      onClick={async () => {
-                        updatePromptConfig(tempPromptConfig);
-                        await fetchHistory(tempPromptConfig);
-                        setIsSavedSuccessfully(true);
-                        setTimeout(() => setIsSavedSuccessfully(false), 3000);
-                      }}
-                    >
-                      Save Changes
-                    </button>
-                    {isSavedSuccessfully && (
-                      <span className="save-success-badge">
-                        ✓ Saved & updated dynamically!
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="modal-footer">
-              <button 
-                type="button"
-                className="clear-btn secondary" 
-                onClick={() => {
-                  handleClearHistory();
-                  toggleModal();
-                }}
-              >
-                Reset Chat History
-              </button>
-              <button 
-                type="button"
-                className="modal-action-btn primary" 
-                onClick={toggleModal}
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isModalOpen}
+        onClose={toggleModal}
+        providers={providers}
+        availableTones={availableTones}
+        selectedProvider={selectedProvider}
+        selectedModel={selectedModel}
+        onProviderChange={updateProvider}
+        onModelChange={updateModel}
+        promptConfig={promptConfig}
+        onPromptConfigSave={handlePromptConfigSave}
+        onClearHistory={handleClearHistory}
+      />
     </div>
   );
 }
 
 export default App;
-
