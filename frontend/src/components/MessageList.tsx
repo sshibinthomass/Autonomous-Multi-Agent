@@ -34,7 +34,7 @@ export const MessageList: React.FC<MessageListProps> = ({
         })}
 
       {/* Loading Indicator */}
-      {isLoading && (
+      {isLoading && messages.length > 0 && messages[messages.length - 1]?.role !== 'assistant' && (
         <div className="message-row bot-row">
           <div className="avatar">AI</div>
           <div className="message-bubble loading-bubble">

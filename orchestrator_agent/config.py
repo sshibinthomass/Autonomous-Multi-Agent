@@ -8,7 +8,7 @@ dotenv.load_dotenv()
 AVAILABLE_MODELS = {
     "openai": ["gpt-4o-mini", "gpt-4o", "gpt-4.5-preview"],
     "gemini": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash"],
-    "groq": ["openai/gpt-oss-20b","llama-3.3-70b-versatile", "mixtral-8x7b-32768", "gemma2-9b-it"],
+    "groq": ["openai/gpt-oss-20b","openai/gpt-oss-20b","llama-3.1-8b-instant","llama-3.3-70b-versatile"],
     "anthropic": ["claude-haiku-4-5-20251001","claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"],
     "ollama": ["gemma3:1b","llama3", "mistral", "phi3"]
 }

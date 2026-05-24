@@ -332,12 +332,66 @@ function App() {
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.detail || 'Failed to get agent response');
+        let errorDetail = 'Failed to get agent response';
+        try {
+          const errData = await response.json();
+          errorDetail = errData.detail || errorDetail;
+        } catch (_) {}
+        throw new Error(errorDetail);
       }
 
-      const data = await response.json();
-      setMessages(data.messages || []);
+      // Add a placeholder message for the assistant
+      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('Readable stream not supported or unavailable.');
+      }
+
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Parse SSE data format: "data: {...}\n\n"
+        const lines = buffer.split('\n');
+        // Keep the last incomplete line in the buffer
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data: ')) continue;
+
+          const jsonStr = trimmed.slice(6);
+          try {
+            const data = JSON.parse(jsonStr);
+            if (data.type === 'token') {
+              setMessages(prev => {
+                const updated = [...prev];
+                const lastMsg = updated[updated.length - 1];
+                if (lastMsg && lastMsg.role === 'assistant') {
+                  updated[updated.length - 1] = {
+                    ...lastMsg,
+                    content: lastMsg.content + data.content
+                  };
+                }
+                return updated;
+              });
+            } else if (data.type === 'done') {
+              if (data.messages) {
+                setMessages(data.messages);
+              }
+            }
+          } catch (e) {
+            console.error('Error parsing SSE JSON:', e);
+          }
+        }
+      }
+
       fetchSessions(); // Refresh sessions to update auto-generated names/timestamps
     } catch (err: any) {
       console.error('Chat error:', err);

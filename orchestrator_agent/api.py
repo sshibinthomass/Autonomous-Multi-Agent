@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 # Ensure the project root is in python path
@@ -56,21 +57,22 @@ def get_settings():
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     """
-    Receives current message history and runs it through the LangGraph StateGraph pipeline.
+    Receives current message history and runs it through the LangGraph StateGraph pipeline,
+    streaming response tokens chunk-by-chunk using Server-Sent Events (SSE).
     """
     if not request.messages:
         raise HTTPException(status_code=400, detail="Messages list cannot be empty.")
 
     try:
-        # Run graph execution service
-        all_messages = await execute_chatbot_graph(
+        # Run streaming graph execution service
+        generator = execute_chatbot_graph(
             messages=request.messages,
             provider=request.provider,
             model=request.model,
             thread_id=request.thread_id,
             prompt_config=request.prompt_config.dict()
         )
-        return all_messages
+        return StreamingResponse(generator, media_type="text/event-stream")
         
     except HTTPException as he:
         raise he
@@ -242,14 +244,14 @@ async def update_session_settings(thread_id: str, req: UpdateSettingsRequest):
                 "model": session["model"],
                 "chatbot_name": session["chatbot_name"],
                 "tone": session["tone"]
-            })
+            }, as_node="chatbot")
         else:
             await graph.aupdate_state(config, {
                 "provider": session["provider"],
                 "model": session["model"],
                 "chatbot_name": session["chatbot_name"],
                 "tone": session["tone"]
-            })
+            }, as_node="chatbot")
             
         return session
     except HTTPException as he:

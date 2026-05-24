@@ -1,6 +1,7 @@
 import sys
+import json
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 from fastapi import HTTPException
 
 # Add project root to sys.path to ensure correct imports
@@ -14,6 +15,8 @@ from orchestrator_agent.graphs.graph_builder import GraphBuilder, memory_checkpo
 from orchestrator_agent.config import get_env_variable
 from orchestrator_agent.schemas import ChatMessage
 from orchestrator_agent.prompts.prompts import get_basic_chatbot_system_prompt
+from orchestrator_agent.session_manager import load_session, save_session, delete_session
+from orchestrator_agent.system_configuration import MAX_HISTORY_MESSAGES
 
 # Import LLM wrappers
 from orchestrator_agent.llms.openai_llm import OpenAILLM
@@ -87,18 +90,14 @@ def to_langchain_messages(messages: List[ChatMessage]):
             converted.append(HumanMessage(content=msg.content))
     return converted
 
-async def execute_chatbot_graph(messages: List[ChatMessage], provider: str, model: str, thread_id: str = "default", prompt_config: dict = None) -> dict:
+async def prepare_chatbot_graph_state(thread_id: str, provider: str, model: str, chatbot_name: str, tone: str):
     """
-    Initializes the required base LLM, compiles the basic chatbot StateGraph,
-    runs it asynchronously using ainvoke with a checkpointer, and returns the full message history and settings.
+    Helper function to resolve session settings, instantiate the base LLM, compile the graph,
+    and ensure the LangGraph checkpointer is correctly seeded from session JSON if it is empty.
+    Returns:
+        tuple: (llm, graph, config, state, existing_messages, resolved_settings)
     """
-    if prompt_config is None:
-        prompt_config = {}
-    chatbot_name = prompt_config.get("chatbot_name", "Jarvis")
-    tone = prompt_config.get("tone", "friendly")
-
     # Load session settings from disk if they exist to preserve individual session config
-    from orchestrator_agent.session_manager import load_session
     session = load_session(thread_id)
     if session:
         chatbot_name = session.get("chatbot_name", chatbot_name)
@@ -108,7 +107,7 @@ async def execute_chatbot_graph(messages: List[ChatMessage], provider: str, mode
 
     # 1. Instantiate the target LLM
     llm = get_base_llm(provider, model)
-    # 2. Build and compile the graph
+    # 2. Build and compile the graph (to resolve checkpointer and configuration)
     builder = GraphBuilder(model=llm)
     graph = await builder.setup_graph("basic_chatbot")
     
@@ -127,9 +126,13 @@ async def execute_chatbot_graph(messages: List[ChatMessage], provider: str, mode
     state = await graph.aget_state(config)
     existing_messages = state.values.get("messages", [])
     
-    # Seed checkpointer from session JSON if memory is empty
+    # State Persistence Recovery Guard:
+    # Since LangGraph's MemorySaver checkpointer resides entirely in RAM, any server restart 
+    # or python process reload (such as hot-reloads) completely clears the checkpointer.
+    # To recover context, if the checkpointer has no record of the thread but a persistent JSON
+    # history exists on disk, we lazily restore the messages and LLM configuration back 
+    # into the checkpointer state. This preserves assistant memory continuity seamlessly.
     if not existing_messages:
-        from orchestrator_agent.session_manager import load_session
         session = load_session(thread_id)
         if session:
             seeded_messages = to_langchain_messages([
@@ -142,36 +145,98 @@ async def execute_chatbot_graph(messages: List[ChatMessage], provider: str, mode
                 "model": session.get("model", model),
                 "chatbot_name": session.get("chatbot_name", chatbot_name),
                 "tone": session.get("tone", tone)
-            })
-            # Reload state
+            }, as_node="chatbot")
+            # Reload graph state from the checkpointer to capture the newly seeded values
             state = await graph.aget_state(config)
             existing_messages = state.values.get("messages", [])
+            
+    resolved_settings = {
+        "provider": provider,
+        "model": model,
+        "chatbot_name": chatbot_name,
+        "tone": tone
+    }
+    return llm, graph, config, state, existing_messages, resolved_settings
+
+async def execute_chatbot_graph(messages: List[ChatMessage], provider: str, model: str, thread_id: str = "default", prompt_config: dict = None):
+    """
+    Initializes the required base LLM, compiles the basic chatbot StateGraph,
+    streams response tokens from the LLM, and updates the memory checkpointer
+    and session history on disk once complete.
+    Yields standard Server-Sent Events (SSE).
+    """
+    if prompt_config is None:
+        prompt_config = {}
+    chatbot_name = prompt_config.get("chatbot_name", "Jarvis")
+    tone = prompt_config.get("tone", "friendly")
+
+    # Call unified helper to resolve LLM, compile graph, and seed checkpointer if needed
+    llm, graph, config, state, existing_messages, settings = await prepare_chatbot_graph_state(
+        thread_id=thread_id,
+        provider=provider,
+        model=model,
+        chatbot_name=chatbot_name,
+        tone=tone
+    )
+    resolved_provider = settings["provider"]
+    resolved_model = settings["model"]
+    resolved_chatbot_name = settings["chatbot_name"]
+    resolved_tone = settings["tone"]
     
     # 4. Prepare new messages
     langchain_messages = to_langchain_messages(messages)
     if not existing_messages:
         # If thread is empty, prepend a default system prompt if not already present
         if not any(isinstance(m, SystemMessage) for m in langchain_messages):
-            prompt = get_basic_chatbot_system_prompt(name=chatbot_name, tone=tone)
+            prompt = get_basic_chatbot_system_prompt(name=resolved_chatbot_name, tone=resolved_tone)
             langchain_messages.insert(0, SystemMessage(content=prompt))
             
-    # 5. Execute state graph asynchronously
-    await graph.ainvoke({"messages": langchain_messages}, config)
+    # Combine system and historical messages to pass to the LLM (mimics process method inside BasicChatbotNode)
+    combined_messages = existing_messages + langchain_messages
     
-    # 6. Save current settings in state checkpoint
+    system_messages = [msg for msg in combined_messages if isinstance(msg, SystemMessage)]
+    other_messages = [msg for msg in combined_messages if not isinstance(msg, SystemMessage)]
+    
+    # Keep only the last MAX_HISTORY_MESSAGES messages
+    sliced_other = other_messages[-MAX_HISTORY_MESSAGES:]
+    
+    # Combine system messages and the sliced messages for model generation
+    llm_input_messages = system_messages + sliced_other
+
+    # 5. Stream the response tokens from the LLM
+    full_ai_content = ""
+    try:
+        async for chunk in llm.astream(llm_input_messages):
+            if chunk.content:
+                full_ai_content += chunk.content
+                yield f"data: {json.dumps({'type': 'token', 'content': chunk.content})}\n\n"
+    except Exception as e:
+        # Fallback to direct ainvoke if astream is not supported or errors out
+        print(f"Streaming failed, falling back to ainvoke: {e}")
+        response = await llm.ainvoke(llm_input_messages)
+        full_ai_content = response.content
+        yield f"data: {json.dumps({'type': 'token', 'content': full_ai_content})}\n\n"
+
+    # 6. Save the AI response and user messages to the checkpointer state
+    # This officially registers the new messages in LangGraph checkpointer
+    ai_message = AIMessage(content=full_ai_content)
     await graph.aupdate_state(config, {
-        "provider": provider,
-        "model": model,
-        "chatbot_name": chatbot_name,
-        "tone": tone
-    })
+        "messages": langchain_messages + [ai_message]
+    }, as_node="chatbot")
     
-    # 7. Retrieve full updated messages and settings state
+    # 7. Save current settings in state checkpoint
+    await graph.aupdate_state(config, {
+        "provider": resolved_provider,
+        "model": resolved_model,
+        "chatbot_name": resolved_chatbot_name,
+        "tone": resolved_tone
+    }, as_node="chatbot")
+    
+    # 8. Retrieve full updated messages and settings state
     updated_state = await graph.aget_state(config)
     all_messages = updated_state.values.get("messages", [])
     
     # Save/update session on disk
-    from orchestrator_agent.session_manager import load_session, save_session
     existing_session = load_session(thread_id)
     
     if existing_session and existing_session.get("name") != "New Chat":
@@ -191,22 +256,24 @@ async def execute_chatbot_graph(messages: List[ChatMessage], provider: str, mode
         thread_id=thread_id,
         name=name,
         messages=[to_chat_dict(m) for m in all_messages],
-        provider=provider,
-        model=model,
-        chatbot_name=chatbot_name,
-        tone=tone,
+        provider=resolved_provider,
+        model=resolved_model,
+        chatbot_name=resolved_chatbot_name,
+        tone=resolved_tone,
         created_at=created_at
     )
     
-    return {
+    final_data = {
+        "type": "done",
         "messages": [to_chat_dict(m) for m in all_messages],
         "settings": {
-            "provider": updated_state.values.get("provider", provider),
-            "model": updated_state.values.get("model", model),
-            "chatbot_name": updated_state.values.get("chatbot_name", chatbot_name),
-            "tone": updated_state.values.get("tone", tone)
+            "provider": updated_state.values.get("provider", resolved_provider),
+            "model": updated_state.values.get("model", resolved_model),
+            "chatbot_name": updated_state.values.get("chatbot_name", resolved_chatbot_name),
+            "tone": updated_state.values.get("tone", resolved_tone)
         }
     }
+    yield f"data: {json.dumps(final_data)}\n\n"
 
 async def get_chatbot_history(provider: str, model: str, thread_id: str = "default", prompt_config: dict = None) -> dict:
     """
@@ -218,96 +285,78 @@ async def get_chatbot_history(provider: str, model: str, thread_id: str = "defau
     chatbot_name = prompt_config.get("chatbot_name", "Jarvis")
     tone = prompt_config.get("tone", "friendly")
 
-    # Load session settings from disk if they exist to preserve individual session config
-    from orchestrator_agent.session_manager import load_session
-    session = load_session(thread_id)
-    if session:
-        chatbot_name = session.get("chatbot_name", chatbot_name)
-        tone = session.get("tone", tone)
-        provider = session.get("provider", provider)
-        model = session.get("model", model)
+    # Call unified helper to resolve LLM, compile graph, and seed checkpointer if needed
+    llm, graph, config, state, messages, settings = await prepare_chatbot_graph_state(
+        thread_id=thread_id,
+        provider=provider,
+        model=model,
+        chatbot_name=chatbot_name,
+        tone=tone
+    )
+    resolved_provider = settings["provider"]
+    resolved_model = settings["model"]
+    resolved_chatbot_name = settings["chatbot_name"]
+    resolved_tone = settings["tone"]
 
-    # A. Compile with default parameters to pull the initial state snapshot
-    llm = get_base_llm(provider, model)
-    builder = GraphBuilder(model=llm)
-    graph = await builder.setup_graph("basic_chatbot")
-    config = {"configurable": {"thread_id": thread_id}}
-    
-    state = await graph.aget_state(config)
-    messages = state.values.get("messages", [])
-    
-    # Load from JSON if checkpointer is empty (e.g. server restarted)
+    # Seed with system message if thread is completely empty (no checkpointer and no JSON session on disk)
     if not messages:
-        from orchestrator_agent.session_manager import load_session, save_session
-        session = load_session(thread_id)
-        if session:
-            msgs_to_seed = to_langchain_messages([
-                ChatMessage(role=m["role"], content=m["content"])
-                for m in session.get("messages", [])
-            ])
-            await graph.aupdate_state(config, {
-                "messages": msgs_to_seed,
-                "provider": session.get("provider", provider),
-                "model": session.get("model", model),
-                "chatbot_name": session.get("chatbot_name", chatbot_name),
-                "tone": session.get("tone", tone)
-            })
-            state = await graph.aget_state(config)
-            messages = state.values.get("messages", [])
-        else:
-            # Initialize system message in state & disk
-            prompt = get_basic_chatbot_system_prompt(name=chatbot_name, tone=tone)
-            system_msg = SystemMessage(content=prompt)
-            await graph.aupdate_state(config, {
-                "messages": [system_msg],
-                "provider": provider,
-                "model": model,
-                "chatbot_name": chatbot_name,
-                "tone": tone
-            })
-            state = await graph.aget_state(config)
-            messages = [system_msg]
-            
-            save_session(
-                thread_id=thread_id,
-                name="New Chat",
-                messages=[to_chat_dict(system_msg)],
-                provider=provider,
-                model=model,
-                chatbot_name=chatbot_name,
-                tone=tone
-            )
+        # Initialize system message in state & disk
+        prompt = get_basic_chatbot_system_prompt(name=resolved_chatbot_name, tone=resolved_tone)
+        system_msg = SystemMessage(content=prompt)
+        await graph.aupdate_state(config, {
+            "messages": [system_msg],
+            "provider": resolved_provider,
+            "model": resolved_model,
+            "chatbot_name": resolved_chatbot_name,
+            "tone": resolved_tone
+        }, as_node="chatbot")
+        state = await graph.aget_state(config)
+        messages = [system_msg]
+        
+        save_session(
+            thread_id=thread_id,
+            name="New Chat",
+            messages=[to_chat_dict(system_msg)],
+            provider=resolved_provider,
+            model=resolved_model,
+            chatbot_name=resolved_chatbot_name,
+            tone=resolved_tone
+        )
             
     # B. If thread was previously active and has saved settings, dynamically reload/compile with those settings!
     saved_provider = state.values.get("provider")
     saved_model = state.values.get("model")
-    if saved_provider and saved_model and (saved_provider != provider or saved_model != model):
-        llm = get_base_llm(saved_provider, saved_model)
-        builder = GraphBuilder(model=llm)
-        graph = await builder.setup_graph("basic_chatbot")
-        state = await graph.aget_state(config)
-        messages = state.values.get("messages", [])
+    if saved_provider and saved_model and (saved_provider != resolved_provider or saved_model != resolved_model):
+        llm, graph, config, state, messages, settings = await prepare_chatbot_graph_state(
+            thread_id=thread_id,
+            provider=saved_provider,
+            model=saved_model,
+            chatbot_name=resolved_chatbot_name,
+            tone=resolved_tone
+        )
+        # Re-resolve active settings
+        resolved_provider = settings["provider"]
+        resolved_model = settings["model"]
         
     # Check if we need to dynamically update the system prompt in the checkpointer
     saved_chatbot_name = state.values.get("chatbot_name")
     saved_tone = state.values.get("tone")
-    if messages and (saved_chatbot_name != chatbot_name or saved_tone != tone):
+    if messages and (saved_chatbot_name != resolved_chatbot_name or saved_tone != resolved_tone):
         for msg in messages:
             if isinstance(msg, SystemMessage):
-                new_prompt = get_basic_chatbot_system_prompt(name=chatbot_name, tone=tone)
+                new_prompt = get_basic_chatbot_system_prompt(name=resolved_chatbot_name, tone=resolved_tone)
                 msg.content = new_prompt
                 await graph.aupdate_state(config, {
                     "messages": [msg],
-                    "chatbot_name": chatbot_name,
-                    "tone": tone
-                })
+                    "chatbot_name": resolved_chatbot_name,
+                    "tone": resolved_tone
+                }, as_node="chatbot")
                 break
         # Reload state to fetch the updated messages
         state = await graph.aget_state(config)
         messages = state.values.get("messages", [])
         
         # Keep JSON file in sync with system prompt update
-        from orchestrator_agent.session_manager import load_session, save_session
         existing_session = load_session(thread_id)
         name = existing_session.get("name", "New Chat") if existing_session else "New Chat"
         created_at = existing_session.get("created_at") if existing_session else None
@@ -315,20 +364,20 @@ async def get_chatbot_history(provider: str, model: str, thread_id: str = "defau
             thread_id=thread_id,
             name=name,
             messages=[to_chat_dict(m) for m in messages],
-            provider=state.values.get("provider", provider),
-            model=state.values.get("model", model),
-            chatbot_name=chatbot_name,
-            tone=tone,
+            provider=state.values.get("provider", resolved_provider),
+            model=state.values.get("model", resolved_model),
+            chatbot_name=resolved_chatbot_name,
+            tone=resolved_tone,
             created_at=created_at
         )
         
     return {
         "messages": [to_chat_dict(m) for m in messages],
         "settings": {
-            "provider": state.values.get("provider", provider),
-            "model": state.values.get("model", model),
-            "chatbot_name": state.values.get("chatbot_name", chatbot_name),
-            "tone": state.values.get("tone", tone)
+            "provider": state.values.get("provider", resolved_provider),
+            "model": state.values.get("model", resolved_model),
+            "chatbot_name": state.values.get("chatbot_name", resolved_chatbot_name),
+            "tone": state.values.get("tone", resolved_tone)
         }
     }
 
@@ -337,7 +386,4 @@ def clear_chatbot_history(thread_id: str) -> None:
     Removes a thread and its message history from memory checkpointer storage and disk.
     """
     memory_checkpointer.storage.pop(thread_id, None)
-    
-    from orchestrator_agent.session_manager import delete_session
     delete_session(thread_id)
-
