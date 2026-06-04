@@ -125,11 +125,11 @@ copy example.env .env
 Open `.env` and fill in the API keys for the providers you intend to use:
 
 ```env
-OPENAI_API_KEY=your_openai_key_here
-GEMINI_API_KEY=your_gemini_key_here
-GROQ_API_KEY=your_groq_key_here
-ANTHROPIC_API_KEY=your_anthropic_key_here
-OLLAMA_BASE_URL=http://localhost:11434  # Optional, default Ollama port
+OPENAI_API_KEY=your_openai_key_here  #https://platform.openai.com/api-keys
+GEMINI_API_KEY=your_gemini_key_here #https://aistudio.google.com/api-keys?project=gmail-mcp-465017
+GROQ_API_KEY=your_groq_key_here  #https://console.groq.com/keys
+ANTHROPIC_API_KEY=your_anthropic_key_here #https://platform.claude.com/settings/workspaces/default/keys
+OLLAMA_BASE_URL=http://localhost:11434  # Optional, default Ollama port #https://ollama.com/download
 ```
 
 > [!NOTE]
@@ -141,7 +141,7 @@ OLLAMA_BASE_URL=http://localhost:11434  # Optional, default Ollama port
 
 Ensure you have a modern Python environment installed (Python `>= 3.13` recommended).
 
-#### A. Using `uv` (Recommended)
+#### A. Using `uv` (Recommended)  #https://docs.astral.sh/uv/getting-started/installation/
 
 This project uses the modern, lightning-fast Python packaging tool `uv`. If you have `uv` installed, simply run:
 
@@ -177,6 +177,8 @@ You can run the frontend either by navigating to the folder or directly from the
 #### Option A: Running from the Root Directory (Quickest)
 You can use the `--prefix` flag to run `npm` commands for a subfolder without leaving the root directory:
 
+# Install NPM
+https://nodejs.org/en/download
 ```bash
 # Install dependencies from root
 npm install --prefix frontend
