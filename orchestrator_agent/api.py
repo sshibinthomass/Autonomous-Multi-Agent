@@ -215,6 +215,7 @@ async def update_session_settings(thread_id: str, req: UpdateSettingsRequest):
             model=session["model"],
             chatbot_name=session["chatbot_name"],
             tone=session["tone"],
+            date_time=session.get("date_time"),
             created_at=session.get("created_at"),
             updated_at=time.time()
         )
@@ -243,14 +244,16 @@ async def update_session_settings(thread_id: str, req: UpdateSettingsRequest):
                 "provider": session["provider"],
                 "model": session["model"],
                 "chatbot_name": session["chatbot_name"],
-                "tone": session["tone"]
+                "tone": session["tone"],
+                "date_time": session.get("date_time")
             }, as_node="chatbot")
         else:
             await graph.aupdate_state(config, {
                 "provider": session["provider"],
                 "model": session["model"],
                 "chatbot_name": session["chatbot_name"],
-                "tone": session["tone"]
+                "tone": session["tone"],
+                "date_time": session.get("date_time")
             }, as_node="chatbot")
             
         return session

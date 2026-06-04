@@ -35,6 +35,7 @@ class GraphBuilder:
             usecase: The use case to set up ("basic_chatbot")
         """
         if usecase == "basic_chatbot":
+            print
             basic_chatbot_build_graph(self.graph_builder, self.llm)
         else:
             raise ValueError(f"Unsupported use case: {usecase}")

@@ -49,6 +49,7 @@ function App() {
   const [selectedModel, setSelectedModel] = useState<string>(
     () => loadSetting(STORAGE_KEYS.model, 'gpt-4o-mini')
   );
+  const [activeDateTime, setActiveDateTime] = useState<string>('');
 
   // Prompt configuration as a single dict
   const [promptConfig, setPromptConfig] = useState<PromptConfig>(loadPromptConfig);
@@ -142,6 +143,10 @@ function App() {
         saveSetting(STORAGE_KEYS.provider, data.settings.provider);
         saveSetting(STORAGE_KEYS.model, data.settings.model);
 
+        if (data.settings.date_time) {
+          setActiveDateTime(data.settings.date_time);
+        }
+
         const loadedPc = {
           chatbot_name: data.settings.chatbot_name,
           tone: data.settings.tone
@@ -210,6 +215,9 @@ function App() {
             await fetchSessions();
             if (!cancelled) {
               handleSelectSession(newSession.id);
+              if (newSession.date_time) {
+                setActiveDateTime(newSession.date_time);
+              }
             }
           }
         }
@@ -310,7 +318,16 @@ function App() {
     if (!inputValue.trim() || isLoading) return;
 
     setErrorMsg(null);
-    const userMessage: Message = { role: 'user', content: inputValue.trim() };
+    
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const now = new Date();
+    const currentTimestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    
+    const userMessage: Message = { 
+      role: 'user', 
+      content: inputValue.trim(),
+      timestamp: currentTimestamp
+    };
     
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
@@ -341,7 +358,14 @@ function App() {
       }
 
       // Add a placeholder message for the assistant
-      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+      const nowPlaceholder = new Date();
+      const placeholderTimestamp = `${nowPlaceholder.getFullYear()}-${pad(nowPlaceholder.getMonth() + 1)}-${pad(nowPlaceholder.getDate())} ${pad(nowPlaceholder.getHours())}:${pad(nowPlaceholder.getMinutes())}:${pad(nowPlaceholder.getSeconds())}`;
+      
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: '',
+        timestamp: placeholderTimestamp
+      }]);
 
       const reader = response.body?.getReader();
       if (!reader) {
@@ -384,6 +408,9 @@ function App() {
             } else if (data.type === 'done') {
               if (data.messages) {
                 setMessages(data.messages);
+              }
+              if (data.settings && data.settings.date_time) {
+                setActiveDateTime(data.settings.date_time);
               }
             }
           } catch (e) {
@@ -479,6 +506,7 @@ function App() {
           onToggleModal={toggleModal}
           isSessionsSidebarOpen={isSessionsSidebarOpen}
           onToggleSessionsSidebar={() => setIsSessionsSidebarOpen(prev => !prev)}
+          dateTime={activeDateTime}
         />
 
         {/* Error banner */}

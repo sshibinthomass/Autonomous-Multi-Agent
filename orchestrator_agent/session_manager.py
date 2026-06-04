@@ -1,5 +1,6 @@
 import json
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 
@@ -39,6 +40,7 @@ def save_session(
     model: str,
     chatbot_name: str,
     tone: str,
+    date_time: Optional[str] = None,
     created_at: Optional[float] = None,
     updated_at: Optional[float] = None
 ) -> Dict[str, Any]:
@@ -57,6 +59,7 @@ def save_session(
         "model": model,
         "chatbot_name": chatbot_name,
         "tone": tone,
+        "date_time": date_time or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "messages": messages
     }
     
@@ -85,7 +88,8 @@ def list_sessions() -> List[Dict[str, Any]]:
                     "provider": data.get("provider", "openai"),
                     "model": data.get("model", "gpt-4o-mini"),
                     "chatbot_name": data.get("chatbot_name", "Jarvis"),
-                    "tone": data.get("tone", "friendly")
+                    "tone": data.get("tone", "friendly"),
+                    "date_time": data.get("date_time", "")
                 })
         except Exception as e:
             print(f"Error reading session file {path}: {e}")

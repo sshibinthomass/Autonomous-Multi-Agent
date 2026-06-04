@@ -1,5 +1,6 @@
 import sys
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import List
 from fastapi import HTTPException
@@ -35,7 +36,16 @@ def to_chat_dict(message) -> dict:
         role = "assistant"
     else:
         role = "user"
-    return {"role": role, "content": message.content}
+        
+    dct = {"role": role, "content": message.content}
+    
+    timestamp = message.additional_kwargs.get("timestamp")
+    if not timestamp:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        message.additional_kwargs["timestamp"] = timestamp
+        
+    dct["timestamp"] = timestamp
+    return dct
 
 def get_base_llm(provider: str, model: str):
     """
@@ -82,12 +92,13 @@ def to_langchain_messages(messages: List[ChatMessage]):
     """
     converted = []
     for msg in messages:
+        additional_kwargs = {"timestamp": msg.timestamp} if msg.timestamp else {}
         if msg.role == "system":
-            converted.append(SystemMessage(content=msg.content))
+            converted.append(SystemMessage(content=msg.content, additional_kwargs=additional_kwargs))
         elif msg.role == "assistant":
-            converted.append(AIMessage(content=msg.content))
+            converted.append(AIMessage(content=msg.content, additional_kwargs=additional_kwargs))
         else:
-            converted.append(HumanMessage(content=msg.content))
+            converted.append(HumanMessage(content=msg.content, additional_kwargs=additional_kwargs))
     return converted
 
 async def prepare_chatbot_graph_state(thread_id: str, provider: str, model: str, chatbot_name: str, tone: str):
@@ -126,6 +137,8 @@ async def prepare_chatbot_graph_state(thread_id: str, provider: str, model: str,
     state = await graph.aget_state(config)
     existing_messages = state.values.get("messages", [])
     
+    state_date_time = state.values.get("date_time")
+    
     # State Persistence Recovery Guard:
     # Since LangGraph's MemorySaver checkpointer resides entirely in RAM, any server restart 
     # or python process reload (such as hot-reloads) completely clears the checkpointer.
@@ -136,25 +149,31 @@ async def prepare_chatbot_graph_state(thread_id: str, provider: str, model: str,
         session = load_session(thread_id)
         if session:
             seeded_messages = to_langchain_messages([
-                ChatMessage(role=m["role"], content=m["content"])
+                ChatMessage(role=m["role"], content=m["content"], timestamp=m.get("timestamp"))
                 for m in session.get("messages", [])
             ])
+            state_date_time = session.get("date_time") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             await graph.aupdate_state(config, {
                 "messages": seeded_messages,
                 "provider": session.get("provider", provider),
                 "model": session.get("model", model),
                 "chatbot_name": session.get("chatbot_name", chatbot_name),
-                "tone": session.get("tone", tone)
+                "tone": session.get("tone", tone),
+                "date_time": state_date_time
             }, as_node="chatbot")
             # Reload graph state from the checkpointer to capture the newly seeded values
             state = await graph.aget_state(config)
             existing_messages = state.values.get("messages", [])
             
+    if not state_date_time:
+        state_date_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
     resolved_settings = {
         "provider": provider,
         "model": model,
         "chatbot_name": chatbot_name,
-        "tone": tone
+        "tone": tone,
+        "date_time": state_date_time
     }
     return llm, graph, config, state, existing_messages, resolved_settings
 
@@ -225,11 +244,13 @@ async def execute_chatbot_graph(messages: List[ChatMessage], provider: str, mode
     }, as_node="chatbot")
     
     # 7. Save current settings in state checkpoint
+    current_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     await graph.aupdate_state(config, {
         "provider": resolved_provider,
         "model": resolved_model,
         "chatbot_name": resolved_chatbot_name,
-        "tone": resolved_tone
+        "tone": resolved_tone,
+        "date_time": current_dt
     }, as_node="chatbot")
     
     # 8. Retrieve full updated messages and settings state
@@ -260,6 +281,7 @@ async def execute_chatbot_graph(messages: List[ChatMessage], provider: str, mode
         model=resolved_model,
         chatbot_name=resolved_chatbot_name,
         tone=resolved_tone,
+        date_time=updated_state.values.get("date_time", current_dt),
         created_at=created_at
     )
     
@@ -270,7 +292,8 @@ async def execute_chatbot_graph(messages: List[ChatMessage], provider: str, mode
             "provider": updated_state.values.get("provider", resolved_provider),
             "model": updated_state.values.get("model", resolved_model),
             "chatbot_name": updated_state.values.get("chatbot_name", resolved_chatbot_name),
-            "tone": updated_state.values.get("tone", resolved_tone)
+            "tone": updated_state.values.get("tone", resolved_tone),
+            "date_time": updated_state.values.get("date_time", current_dt)
         }
     }
     yield f"data: {json.dumps(final_data)}\n\n"
@@ -303,12 +326,14 @@ async def get_chatbot_history(provider: str, model: str, thread_id: str = "defau
         # Initialize system message in state & disk
         prompt = get_basic_chatbot_system_prompt(name=resolved_chatbot_name, tone=resolved_tone)
         system_msg = SystemMessage(content=prompt)
+        current_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         await graph.aupdate_state(config, {
             "messages": [system_msg],
             "provider": resolved_provider,
             "model": resolved_model,
             "chatbot_name": resolved_chatbot_name,
-            "tone": resolved_tone
+            "tone": resolved_tone,
+            "date_time": current_dt
         }, as_node="chatbot")
         state = await graph.aget_state(config)
         messages = [system_msg]
@@ -320,7 +345,8 @@ async def get_chatbot_history(provider: str, model: str, thread_id: str = "defau
             provider=resolved_provider,
             model=resolved_model,
             chatbot_name=resolved_chatbot_name,
-            tone=resolved_tone
+            tone=resolved_tone,
+            date_time=current_dt
         )
             
     # B. If thread was previously active and has saved settings, dynamically reload/compile with those settings!
@@ -368,6 +394,7 @@ async def get_chatbot_history(provider: str, model: str, thread_id: str = "defau
             model=state.values.get("model", resolved_model),
             chatbot_name=resolved_chatbot_name,
             tone=resolved_tone,
+            date_time=state.values.get("date_time", settings["date_time"]),
             created_at=created_at
         )
         
@@ -377,7 +404,8 @@ async def get_chatbot_history(provider: str, model: str, thread_id: str = "defau
             "provider": state.values.get("provider", resolved_provider),
             "model": state.values.get("model", resolved_model),
             "chatbot_name": state.values.get("chatbot_name", resolved_chatbot_name),
-            "tone": state.values.get("tone", resolved_tone)
+            "tone": state.values.get("tone", resolved_tone),
+            "date_time": state.values.get("date_time", settings["date_time"])
         }
     }
 

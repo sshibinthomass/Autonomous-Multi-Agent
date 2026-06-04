@@ -9,6 +9,7 @@ export interface Session {
   model: string;
   chatbot_name: string;
   tone: string;
+  date_time?: string;
 }
 
 interface SessionsSidebarProps {
@@ -148,9 +149,16 @@ export const SessionsSidebar: React.FC<SessionsSidebarProps> = ({
                       <span className="session-item-name" title={session.name}>
                         {session.name}
                       </span>
-                      <span className="session-item-meta">
-                        {session.model.toUpperCase()}
-                      </span>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span className="session-item-meta">
+                          {session.model.toUpperCase()}
+                        </span>
+                        {session.date_time && (
+                          <span className="session-item-meta" style={{ opacity: 0.6 }}>
+                            {session.date_time}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="session-item-actions">
                       <button

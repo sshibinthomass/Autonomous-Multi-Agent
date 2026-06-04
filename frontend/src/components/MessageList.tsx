@@ -26,8 +26,25 @@ export const MessageList: React.FC<MessageListProps> = ({
               }`}
             >
               <div className="avatar">{msg.role === 'user' ? 'U' : 'AI'}</div>
-              <div className="message-bubble">
-                <Markdown content={msg.content} />
+              <div className="message-bubble-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '100%' }}>
+                <div className="message-bubble">
+                  <Markdown content={msg.content} />
+                </div>
+                {msg.timestamp && (
+                  <span
+                    className="message-timestamp"
+                    style={{
+                      fontSize: '0.7rem',
+                      color: 'var(--text-muted)',
+                      alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                      opacity: 0.6,
+                      marginTop: '2px',
+                      padding: '0 4px',
+                    }}
+                  >
+                    {msg.timestamp}
+                  </span>
+                )}
               </div>
             </div>
           );

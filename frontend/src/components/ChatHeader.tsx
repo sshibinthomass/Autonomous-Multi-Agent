@@ -7,6 +7,7 @@ interface ChatHeaderProps {
   onToggleModal: () => void;
   isSessionsSidebarOpen: boolean;
   onToggleSessionsSidebar: () => void;
+  dateTime?: string;
 }
 
 export const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -16,6 +17,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   onToggleModal,
   isSessionsSidebarOpen,
   onToggleSessionsSidebar,
+  dateTime,
 }) => {
   return (
     <header className="chat-header">
@@ -45,6 +47,27 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       </div>
       
       <div className="chat-header-actions">
+        {dateTime && (
+          <div className="status-indicator" style={{ marginRight: '8px' }}>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ width: '14px', height: '14px', marginRight: '4px', verticalAlign: 'middle', opacity: 0.8 }}
+            >
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            Session Time:{' '}
+            <strong style={{ marginLeft: '4px' }}>
+              {dateTime}
+            </strong>
+          </div>
+        )}
         <div className="status-indicator">
           <span className="dot active"></span>
           Active Model:{' '}

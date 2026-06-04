@@ -9,6 +9,8 @@ class ChatMessage(BaseModel):
     """
     role: str  # Dictates who sent the message: 'user', 'assistant', or 'system'
     content: str  # The actual text payload of the message
+    timestamp: Optional[str] = None
+
 
 class PromptConfig(BaseModel):
     """
