@@ -141,29 +141,13 @@ OLLAMA_BASE_URL=http://localhost:11434  # Optional, default Ollama port #https:/
 
 Ensure you have a modern Python environment installed (Python `>= 3.13` recommended).
 
-#### A. Using `uv` (Recommended)  #https://docs.astral.sh/uv/getting-started/installation/
+#### Using `uv` (Recommended)
 
-This project uses the modern, lightning-fast Python packaging tool `uv`. If you have `uv` installed, simply run:
+This project uses the modern `uv` runner to sync/install dependencies and start the API. Run:
 
 ```bash
-# Sync/install project dependencies and start the API
+# Sync/install project dependencies and start the API with uv
 uv run uvicorn orchestrator_agent.api:app --host 127.0.0.1 --port 8080 --reload
-```
-
-#### B. Using standard `pip`
-
-If you are using standard Python virtual environments, create one, activate it, install dependencies, and run:
-
-```bash
-# Create and activate environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
-
-# Install dependencies listed in pyproject.toml
-pip install -e .
-
-# Start the FastAPI server
-uvicorn orchestrator_agent.api:app --host 127.0.0.1 --port 8080 --reload
 ```
 
 The backend server will run at `http://127.0.0.1:8080`.
