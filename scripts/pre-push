@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# Pre-push hook to run pytest before pushing code to remote repo.
+# If tests fail, the push is prevented.
+
+echo "========================================="
+echo "Running pytest suite before pushing..."
+echo "========================================="
+
+# Run the pytest suite
+uv run pytest
+
+RESULT=$?
+
+if [ $RESULT -ne 0 ]; then
+  echo ""
+  echo "❌ Error: Pytest suite failed! Push aborted."
+  echo "Please fix the failing tests before pushing."
+  echo "========================================="
+  exit 1
+fi
+
+echo ""
+echo "✅ Success: All tests passed. Proceeding with push."
+echo "========================================="
+exit 0

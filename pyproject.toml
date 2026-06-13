@@ -18,3 +18,15 @@ dependencies = [
     "uvicorn>=0.28.0",
     "langsmith>=0.8.5",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-asyncio>=0.23.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
+
