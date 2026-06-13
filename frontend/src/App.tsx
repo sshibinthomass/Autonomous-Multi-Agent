@@ -357,16 +357,6 @@ function App() {
         throw new Error(errorDetail);
       }
 
-      // Add a placeholder message for the assistant
-      const nowPlaceholder = new Date();
-      const placeholderTimestamp = `${nowPlaceholder.getFullYear()}-${pad(nowPlaceholder.getMonth() + 1)}-${pad(nowPlaceholder.getDate())} ${pad(nowPlaceholder.getHours())}:${pad(nowPlaceholder.getMinutes())}:${pad(nowPlaceholder.getSeconds())}`;
-      
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: '',
-        timestamp: placeholderTimestamp
-      }]);
-
       const reader = response.body?.getReader();
       if (!reader) {
         throw new Error('Readable stream not supported or unavailable.');
@@ -402,6 +392,42 @@ function App() {
                     ...lastMsg,
                     content: lastMsg.content + data.content
                   };
+                } else {
+                  const now = new Date();
+                  const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+                  updated.push({
+                    role: 'assistant',
+                    content: data.content,
+                    timestamp: timestamp
+                  });
+                }
+                return updated;
+              });
+            } else if (data.type === 'tool_start') {
+              const now = new Date();
+              const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+              const argStr = Object.entries(data.inputs || {}).map(([k, v]) => `${k}=${v}`).join(', ');
+              setMessages(prev => [
+                ...prev,
+                {
+                  role: 'tool',
+                  name: data.name,
+                  content: `Calling tool: ${data.name}(${argStr})...`,
+                  timestamp: timestamp
+                }
+              ]);
+            } else if (data.type === 'tool_end') {
+              setMessages(prev => {
+                const updated = [...prev];
+                // Update the last tool message matching name
+                for (let i = updated.length - 1; i >= 0; i--) {
+                  if (updated[i].role === 'tool' && updated[i].name === data.name) {
+                    updated[i] = {
+                      ...updated[i],
+                      content: `Tool ${data.name} returned: ${data.output}`
+                    };
+                    break;
+                  }
                 }
                 return updated;
               });

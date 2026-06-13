@@ -20,6 +20,9 @@ class MockLLM:
     def __init__(self):
         self.invoked_messages = None
 
+    def bind_tools(self, tools):
+        return self
+
     def invoke(self, messages):
         self.invoked_messages = messages
         last_msg = messages[-1].content

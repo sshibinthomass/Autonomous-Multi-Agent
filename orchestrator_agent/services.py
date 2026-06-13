@@ -11,7 +11,7 @@ project_root = current_file.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 from orchestrator_agent.graphs.graph_builder import GraphBuilder, memory_checkpointer
 from orchestrator_agent.config import get_env_variable
 from orchestrator_agent.schemas import ChatMessage
@@ -34,10 +34,30 @@ def to_chat_dict(message) -> dict:
         role = "system"
     elif isinstance(message, AIMessage):
         role = "assistant"
+    elif isinstance(message, ToolMessage):
+        role = "tool"
     else:
         role = "user"
         
-    dct = {"role": role, "content": message.content}
+    content = message.content
+    if isinstance(content, list):
+        text_parts = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                text_parts.append(block.get("text", ""))
+            elif isinstance(block, str):
+                text_parts.append(block)
+        content = "".join(text_parts)
+    elif content is None:
+        content = ""
+
+    dct = {"role": role, "content": content}
+    
+    if isinstance(message, AIMessage) and message.tool_calls:
+        dct["tool_calls"] = message.tool_calls
+    if isinstance(message, ToolMessage):
+        dct["tool_call_id"] = message.tool_call_id
+        dct["name"] = message.name
     
     timestamp = message.additional_kwargs.get("timestamp")
     if not timestamp:
@@ -96,7 +116,12 @@ def to_langchain_messages(messages: List[ChatMessage]):
         if msg.role == "system":
             converted.append(SystemMessage(content=msg.content, additional_kwargs=additional_kwargs))
         elif msg.role == "assistant":
-            converted.append(AIMessage(content=msg.content, additional_kwargs=additional_kwargs))
+            tool_calls = msg.tool_calls if hasattr(msg, "tool_calls") and msg.tool_calls else []
+            converted.append(AIMessage(content=msg.content, tool_calls=tool_calls, additional_kwargs=additional_kwargs))
+        elif msg.role == "tool":
+            tool_call_id = msg.tool_call_id if hasattr(msg, "tool_call_id") and msg.tool_call_id else ""
+            name = msg.name if hasattr(msg, "name") and msg.name else ""
+            converted.append(ToolMessage(content=msg.content, tool_call_id=tool_call_id, name=name, additional_kwargs=additional_kwargs))
         else:
             converted.append(HumanMessage(content=msg.content, additional_kwargs=additional_kwargs))
     return converted
@@ -149,7 +174,14 @@ async def prepare_chatbot_graph_state(thread_id: str, provider: str, model: str,
         session = load_session(thread_id)
         if session:
             seeded_messages = to_langchain_messages([
-                ChatMessage(role=m["role"], content=m["content"], timestamp=m.get("timestamp"))
+                ChatMessage(
+                    role=m["role"],
+                    content=m["content"],
+                    timestamp=m.get("timestamp"),
+                    tool_calls=m.get("tool_calls"),
+                    tool_call_id=m.get("tool_call_id"),
+                    name=m.get("name")
+                )
                 for m in session.get("messages", [])
             ])
             state_date_time = session.get("date_time") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -210,40 +242,39 @@ async def execute_chatbot_graph(message: ChatMessage, provider: str, model: str,
             prompt = get_basic_chatbot_system_prompt(name=resolved_chatbot_name, tone=resolved_tone)
             langchain_messages.insert(0, SystemMessage(content=prompt))
             
-    # Combine system and historical messages to pass to the LLM (mimics process method inside BasicChatbotNode)
-    combined_messages = existing_messages + langchain_messages
-    
-    system_messages = [msg for msg in combined_messages if isinstance(msg, SystemMessage)]
-    other_messages = [msg for msg in combined_messages if not isinstance(msg, SystemMessage)]
-    
-    # Keep only the last MAX_HISTORY_MESSAGES messages
-    sliced_other = other_messages[-MAX_HISTORY_MESSAGES:]
-    
-    # Combine system messages and the sliced messages for model generation
-    llm_input_messages = system_messages + sliced_other
+    input_state = {
+        "messages": langchain_messages,
+        "provider": resolved_provider,
+        "model": resolved_model,
+        "chatbot_name": resolved_chatbot_name,
+        "tone": resolved_tone
+    }
 
-    # 5. Stream the response tokens from the LLM
-    full_ai_content = ""
+    # 5. Stream the response using graph.astream_events
     try:
-        async for chunk in llm.astream(llm_input_messages):
-            if chunk.content:
-                full_ai_content += chunk.content
-                yield f"data: {json.dumps({'type': 'token', 'content': chunk.content})}\n\n"
+        async for event in graph.astream_events(input_state, config, version="v2"):
+            kind = event["event"]
+            if kind == "on_chat_model_stream":
+                content = event["data"]["chunk"].content
+                if content:
+                    yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
+            elif kind == "on_tool_start":
+                name = event["name"]
+                inputs = event["data"].get("input", {})
+                yield f"data: {json.dumps({'type': 'tool_start', 'name': name, 'inputs': inputs})}\n\n"
+            elif kind == "on_tool_end":
+                name = event["name"]
+                output = event["data"].get("output")
+                if hasattr(output, "content"):
+                    output_str = output.content
+                else:
+                    output_str = str(output)
+                yield f"data: {json.dumps({'type': 'tool_end', 'name': name, 'output': output_str})}\n\n"
     except Exception as e:
-        # Fallback to direct ainvoke if astream is not supported or errors out
-        print(f"Streaming failed, falling back to ainvoke: {e}")
-        response = await llm.ainvoke(llm_input_messages)
-        full_ai_content = response.content
-        yield f"data: {json.dumps({'type': 'token', 'content': full_ai_content})}\n\n"
+        print(f"Error during graph streaming, invoking graph: {e}")
+        await graph.ainvoke(input_state, config)
 
-    # 6. Save the AI response and user messages to the checkpointer state
-    # This officially registers the new messages in LangGraph checkpointer
-    ai_message = AIMessage(content=full_ai_content)
-    await graph.aupdate_state(config, {
-        "messages": langchain_messages + [ai_message]
-    }, as_node="chatbot")
-    
-    # 7. Save current settings in state checkpoint
+    # 6. Save current settings in state checkpoint
     current_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     await graph.aupdate_state(config, {
         "provider": resolved_provider,
@@ -253,7 +284,7 @@ async def execute_chatbot_graph(message: ChatMessage, provider: str, model: str,
         "date_time": current_dt
     }, as_node="chatbot")
     
-    # 8. Retrieve full updated messages and settings state
+    # 7. Retrieve full updated messages and settings state
     updated_state = await graph.aget_state(config)
     all_messages = updated_state.values.get("messages", [])
     

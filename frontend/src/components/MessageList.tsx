@@ -16,8 +16,44 @@ export const MessageList: React.FC<MessageListProps> = ({
   return (
     <div className="messages-container">
       {messages
-        .filter((msg) => msg.role !== 'system')
+        .filter((msg) => {
+          if (msg.role === 'system') return false;
+          if (msg.role === 'assistant') {
+            const hasNoContent = !msg.content || (typeof msg.content === 'string' && !msg.content.trim());
+            const hasToolCalls = msg.tool_calls && msg.tool_calls.length > 0;
+            if (hasNoContent && hasToolCalls) return false;
+          }
+          return true;
+        })
         .map((msg, index) => {
+          if (msg.role === 'tool') {
+            return (
+              <div
+                key={index}
+                className="message-row tool-row"
+                style={{
+                  alignSelf: 'flex-start',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '10px 16px',
+                  backgroundColor: 'rgba(59, 130, 246, 0.06)',
+                  border: '1px solid rgba(59, 130, 246, 0.15)',
+                  borderLeft: '4px solid var(--primary)',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  maxWidth: '85%',
+                  margin: '4px 0 4px 52px',
+                }}
+              >
+                <span style={{ fontSize: '1rem', display: 'flex', alignItems: 'center' }}>🔧</span>
+                <div style={{ fontFamily: 'Consolas, Monaco, monospace', color: 'var(--text-muted)', wordBreak: 'break-all' }}>
+                  {msg.content}
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div
               key={index}

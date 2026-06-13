@@ -1,7 +1,10 @@
 export interface Message {
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   timestamp?: string;
+  tool_calls?: any[];
+  tool_call_id?: string;
+  name?: string;
 }
 
 export interface ProviderInfo {

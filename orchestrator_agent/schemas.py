@@ -7,9 +7,12 @@ class ChatMessage(BaseModel):
     Used to structure and validate individual messages sent back and forth 
     between the React frontend and the FastAPI backend.
     """
-    role: str  # Dictates who sent the message: 'user', 'assistant', or 'system'
+    role: str  # Dictates who sent the message: 'user', 'assistant', 'system', or 'tool'
     content: str  # The actual text payload of the message
     timestamp: Optional[str] = None
+    tool_calls: Optional[List[Dict]] = None
+    tool_call_id: Optional[str] = None
+    name: Optional[str] = None
 
 
 class PromptConfig(BaseModel):

@@ -33,8 +33,28 @@ class BasicChatbotNode:
         system_messages = [msg for msg in messages if isinstance(msg, SystemMessage)]
         other_messages = [msg for msg in messages if not isinstance(msg, SystemMessage)]
         
-        # Keep only the last MAX_HISTORY_MESSAGES messages
-        sliced_other = other_messages[-MAX_HISTORY_MESSAGES:]
+        # Keep only the last MAX_HISTORY_MESSAGES messages, discarding any orphaned ToolMessages
+        # whose preceding AIMessage with tool_calls was sliced out.
+        temp_slice = other_messages[-MAX_HISTORY_MESSAGES:]
+        
+        from langchain_core.messages import AIMessage, ToolMessage
+        aimsg_tool_ids = set()
+        for msg in temp_slice:
+            if isinstance(msg, AIMessage) and msg.tool_calls:
+                for tc in msg.tool_calls:
+                    if "id" in tc:
+                        aimsg_tool_ids.add(tc["id"])
+                        
+        last_orphan_idx = -1
+        for i, msg in enumerate(temp_slice):
+            if isinstance(msg, ToolMessage):
+                if msg.tool_call_id not in aimsg_tool_ids:
+                    last_orphan_idx = i
+                    
+        if last_orphan_idx != -1:
+            sliced_other = temp_slice[last_orphan_idx + 1:]
+        else:
+            sliced_other = temp_slice
         
         # Combine system messages (which control chatbot personality/settings) and the sliced messages
         input_messages = system_messages + sliced_other

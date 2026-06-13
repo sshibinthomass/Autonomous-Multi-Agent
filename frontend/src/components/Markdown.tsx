@@ -190,7 +190,7 @@ const parseNormalTextBlocks = (text: string): Block[] => {
 };
 
 export const Markdown: React.FC<MarkdownProps> = ({ content }) => {
-  if (!content) return null;
+  if (!content || typeof content !== 'string') return null;
   
   // Split on ``` to identify code blocks vs regular text
   const parts = content.split(/```/g);
