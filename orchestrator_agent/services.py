@@ -177,7 +177,7 @@ async def prepare_chatbot_graph_state(thread_id: str, provider: str, model: str,
     }
     return llm, graph, config, state, existing_messages, resolved_settings
 
-async def execute_chatbot_graph(messages: List[ChatMessage], provider: str, model: str, thread_id: str = "default", prompt_config: dict = None):
+async def execute_chatbot_graph(message: ChatMessage, provider: str, model: str, thread_id: str = "default", prompt_config: dict = None):
     """
     Initializes the required base LLM, compiles the basic chatbot StateGraph,
     streams response tokens from the LLM, and updates the memory checkpointer
@@ -203,7 +203,7 @@ async def execute_chatbot_graph(messages: List[ChatMessage], provider: str, mode
     resolved_tone = settings["tone"]
     
     # 4. Prepare new messages
-    langchain_messages = to_langchain_messages(messages)
+    langchain_messages = to_langchain_messages([message])
     if not existing_messages:
         # If thread is empty, prepend a default system prompt if not already present
         if not any(isinstance(m, SystemMessage) for m in langchain_messages):

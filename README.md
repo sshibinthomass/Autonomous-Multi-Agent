@@ -201,6 +201,39 @@ Open `http://localhost:5173` in your browser to start playing with the agent!
 
 ---
 
+## 🧪 Testing, CI/CD & Git Hooks
+
+This project integrates backend unit testing using `pytest`, automated GitHub Actions CI/CD workflows, and local Git `pre-push` hooks to ensure code stability.
+
+### 1. Running Tests Locally
+Tests are structured under [orchestrator_agent/agent_test/](file:///d:/Github-Projects/Autonomous-Multi-Agent/orchestrator_agent/agent_test/). To run the test suite:
+```bash
+uv run pytest
+```
+This runs unit tests covering state checkpointers, schemas, API converters, and session management.
+
+### 2. Git pre-push Hook Setup
+We configure a Git hook that intercepts any `git push` command, runs the test suite locally, and aborts the push if any test fails.
+
+To initialize the hook on your local machine:
+- **Windows (PowerShell)**:
+  ```powershell
+  .\scripts\setup-git-hooks.ps1
+  ```
+- **macOS / Linux / Git Bash**:
+  ```bash
+  chmod +x scripts/setup-git-hooks.sh
+  ./scripts/setup-git-hooks.sh
+  ```
+
+### 3. Continuous Integration (CI/CD)
+A GitHub Actions workflow is defined in [.github/workflows/ci.yml](file:///d:/Github-Projects/Autonomous-Multi-Agent/.github/workflows/ci.yml). It automatically runs the full test suite in an isolated Ubuntu container for every `push` and `pull_request` targeting the `main` or `master` branches.
+
+For more details on the testing design and hook setups, see the detailed [TESTING_SETUP.md](file:///d:/Github-Projects/Autonomous-Multi-Agent/TESTING_SETUP.md).
+
+---
+
+
 ## 🏛️ Design Patterns Applied
 
 1. **Unified Adapter Pattern:** Decouples the concrete APIs of OpenAI, Anthropic, Gemini, Groq, and Ollama from the core execution engine. The service layers communicate with a standardized LangChain interface, enabling zero-overhead support for new LLMs.

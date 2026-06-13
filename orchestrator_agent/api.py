@@ -57,16 +57,13 @@ def get_settings():
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     """
-    Receives current message history and runs it through the LangGraph StateGraph pipeline,
+    Receives current message and runs it through the LangGraph StateGraph pipeline,
     streaming response tokens chunk-by-chunk using Server-Sent Events (SSE).
     """
-    if not request.messages:
-        raise HTTPException(status_code=400, detail="Messages list cannot be empty.")
-
     try:
         # Run streaming graph execution service
         generator = execute_chatbot_graph(
-            messages=request.messages,
+            message=request.message,
             provider=request.provider,
             model=request.model,
             thread_id=request.thread_id,

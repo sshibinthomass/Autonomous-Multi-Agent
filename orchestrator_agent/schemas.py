@@ -22,12 +22,12 @@ class PromptConfig(BaseModel):
 class ChatRequest(BaseModel):
     """
     Represents the main request payload for the `/api/chat` endpoint.
-    Used to validate that the frontend has provided a valid message history list,
+    Used to validate that the frontend has provided a valid message,
     selected a supported provider, and picked a specific model name.
     """
     thread_id: str = "default"  # To identify the chat session in the backend
     prompt_config: PromptConfig = PromptConfig()  # Centralized prompt configuration variables
-    messages: List[ChatMessage]  # The new message(s) to send (usually just the latest user message)
+    message: ChatMessage  # The new message to send
     provider: str  # The target engine provider: 'openai', 'gemini', 'groq', 'anthropic', 'ollama'
     model: str  # The specific model string (e.g. 'gpt-4o-mini', 'gemini-2.5-flash')
 

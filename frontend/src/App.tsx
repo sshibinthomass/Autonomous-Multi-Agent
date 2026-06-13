@@ -342,7 +342,7 @@ function App() {
         body: JSON.stringify({
           thread_id: threadId,
           prompt_config: promptConfig,
-          messages: [userMessage],
+          message: userMessage,
           provider: selectedProvider,
           model: selectedModel,
         }),
