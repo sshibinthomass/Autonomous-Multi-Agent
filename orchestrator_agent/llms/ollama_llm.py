@@ -17,6 +17,8 @@ class OllamaLLM:
         return ChatOllama(model=selected_ollama_model, base_url=ollama_base_url)   
 
 
+import sys
+
 if __name__ == "__main__":
     # Example usage
     user_controls_input = {
@@ -36,3 +38,4 @@ if __name__ == "__main__":
     except Exception as e:
         print("Error during LLM invocation:", e)
         print("Make sure Ollama is running and the model is available.")
+        sys.exit(1)

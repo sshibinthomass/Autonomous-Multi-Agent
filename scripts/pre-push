@@ -21,6 +21,23 @@ if [ $RESULT -ne 0 ]; then
 fi
 
 echo ""
-echo "✅ Success: All tests passed. Proceeding with push."
+echo "========================================="
+echo "Running LLM verification before pushing..."
+echo "========================================="
+
+# Run LLM verification
+uv run python scripts/verify_llms.py
+
+LLM_RESULT=$?
+
+if [ $LLM_RESULT -ne 0 ]; then
+  echo ""
+  echo "❌ Error: LLM verification failed! Push aborted."
+  echo "========================================="
+  exit 1
+fi
+
+echo ""
+echo "✅ Success: All tests and LLM verifications passed. Proceeding with push."
 echo "========================================="
 exit 0

@@ -13,6 +13,8 @@ class GroqLLM:
         selected_groq_model = self.user_controls_input["selected_llm"]
         return ChatGroq(api_key=groq_api_key, model=selected_groq_model)
 
+import sys
+
 if __name__ == "__main__":
     # Example usage
     user_controls_input = {
@@ -25,5 +27,9 @@ if __name__ == "__main__":
     llm = groq_llm.get_base_llm()
 
     prompt = "Hello, who won the FIFA World Cup in 2018?"
-    response = llm.invoke(prompt)
-    print(response)
+    try:
+        response = llm.invoke(prompt)
+        print(response)
+    except Exception as e:
+        print("Error during LLM invocation:", e)
+        sys.exit(1)

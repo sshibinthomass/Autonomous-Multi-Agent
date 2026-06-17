@@ -19,6 +19,8 @@ class AnthropicLLM:
         return ChatAnthropic(api_key=anthropic_api_key, model=selected_anthropic_model)
 
 
+import sys
+
 if __name__ == "__main__":
     # Example user_controls_input
     user_controls_input = {
@@ -37,5 +39,7 @@ if __name__ == "__main__":
             print("Response:", response)
         except Exception as e:
             print("Error during invocation:", e)
+            sys.exit(1)
     else:
         print("LLM could not be initialized.")
+        sys.exit(1)

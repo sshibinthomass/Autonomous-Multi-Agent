@@ -22,6 +22,8 @@ class GeminiLLM:
         )
 
 
+import sys
+
 if __name__ == "__main__":
     # Example usage
     user_controls_input = {
@@ -41,3 +43,4 @@ if __name__ == "__main__":
         print(response)
     except Exception as e:
         print("Error during LLM invocation:", e)
+        sys.exit(1)
