@@ -17,6 +17,7 @@ dependencies = [
     "fastapi>=0.110.0",
     "uvicorn>=0.28.0",
     "langsmith>=0.8.5",
+    "langfuse>=4.9.0",
 ]
 
 [dependency-groups]

@@ -147,6 +147,26 @@ async def prepare_chatbot_graph_state(thread_id: str, provider: str, model: str,
     builder = GraphBuilder(model=llm)
     graph = await builder.setup_graph("basic_chatbot")
     
+    # Setup optional Langfuse tracing callback
+    callbacks = []
+    lf_public = get_env_variable("LANGFUSE_PUBLIC_KEY")
+    lf_secret = get_env_variable("LANGFUSE_SECRET_KEY")
+    lf_host = get_env_variable("LANGFUSE_HOST")
+    
+    if lf_public and lf_secret:
+        try:
+            from langfuse.langchain import CallbackHandler
+            lf_handler = CallbackHandler(
+                public_key=lf_public,
+                secret_key=lf_secret,
+                host=lf_host if lf_host else "https://cloud.langfuse.com",
+                session_id=thread_id,
+                trace_name=f"agent-{chatbot_name}"
+            )
+            callbacks.append(lf_handler)
+        except Exception as e:
+            print(f"Failed to initialize Langfuse callback handler: {e}")
+
     config = {
         "configurable": {"thread_id": thread_id},
         "metadata": {
@@ -157,6 +177,8 @@ async def prepare_chatbot_graph_state(thread_id: str, provider: str, model: str,
         },
         "tags": [provider, model, tone]
     }
+    if callbacks:
+        config["callbacks"] = callbacks
     
     # 3. Check for existing messages in state
     state = await graph.aget_state(config)
