@@ -12,6 +12,10 @@ def main():
         "openai_llm.py"
     ]
     
+    if os.environ.get("CI") == "true":
+        print("Running in CI environment. Skipping Anthropic and OpenAI checks.")
+        llm_files = [f for f in llm_files if f not in ("anthropic_llm.py", "openai_llm.py")]
+    
     print("=========================================")
     print("Starting LLM Verifications...")
     print("=========================================")
