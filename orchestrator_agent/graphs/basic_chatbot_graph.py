@@ -1,8 +1,8 @@
-from langgraph.graph import START, END
-from langgraph.prebuilt import ToolNode, tools_condition
-
-from pathlib import Path
 import sys
+from pathlib import Path
+
+from langgraph.graph import START
+from langgraph.prebuilt import ToolNode, tools_condition
 
 current_file = Path(__file__).resolve()
 project_root = current_file.parent.parent.parent
@@ -22,8 +22,8 @@ def basic_chatbot_build_graph(graph_builder, llm):
     # 1. Bind mathematical tools to the base LLM instance
     llm_with_tools = llm.bind_tools(math_tools)
     
-    # 2. Instantiate basic chatbot node using the tools-enabled LLM
-    basic_chatbot_node = BasicChatbotNode(llm_with_tools)
+    # 2. Instantiate basic chatbot node with both base and tools-enabled LLMs
+    basic_chatbot_node = BasicChatbotNode(llm, llm_with_tools)
 
     # 3. Add nodes
     graph_builder.add_node("chatbot", basic_chatbot_node.process)

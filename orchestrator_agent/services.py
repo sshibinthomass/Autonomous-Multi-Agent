@@ -1,8 +1,9 @@
-import sys
 import json
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import List
+
 from fastapi import HTTPException
 
 # Add project root to sys.path to ensure correct imports
@@ -11,20 +12,22 @@ project_root = current_file.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
-from orchestrator_agent.graphs.graph_builder import GraphBuilder, memory_checkpointer
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
+
 from orchestrator_agent.config import get_env_variable
-from orchestrator_agent.schemas import ChatMessage
-from orchestrator_agent.prompts.prompts import get_basic_chatbot_system_prompt
-from orchestrator_agent.session_manager import load_session, save_session, delete_session
-from orchestrator_agent.system_configuration import MAX_HISTORY_MESSAGES
+from orchestrator_agent.graphs.graph_builder import GraphBuilder, memory_checkpointer
+from orchestrator_agent.llms.anthropic_llm import AnthropicLLM
+from orchestrator_agent.llms.gemini_llm import GeminiLLM
+from orchestrator_agent.llms.groq_llm import GroqLLM
+from orchestrator_agent.llms.ollama_llm import OllamaLLM
 
 # Import LLM wrappers
 from orchestrator_agent.llms.openai_llm import OpenAILLM
-from orchestrator_agent.llms.gemini_llm import GeminiLLM
-from orchestrator_agent.llms.groq_llm import GroqLLM
-from orchestrator_agent.llms.anthropic_llm import AnthropicLLM
-from orchestrator_agent.llms.ollama_llm import OllamaLLM
+from orchestrator_agent.prompts.prompts import get_basic_chatbot_system_prompt
+from orchestrator_agent.schemas import ChatMessage
+from orchestrator_agent.session_manager import delete_session, load_session, save_session
+from orchestrator_agent.system_configuration import GRAPH_RECURSION_LIMIT
+
 
 def to_chat_dict(message) -> dict:
     """
@@ -110,7 +113,7 @@ def to_langchain_messages(messages: List[ChatMessage]):
     Transforms Pydantic ChatMessage objects (coming from API requests)
     into standard LangChain Message objects (required by GraphBuilder).
     """
-    converted = []
+    converted: List[BaseMessage] = []
     for msg in messages:
         additional_kwargs = {"timestamp": msg.timestamp} if msg.timestamp else {}
         if msg.role == "system":
@@ -148,6 +151,7 @@ async def prepare_chatbot_graph_state(thread_id: str, provider: str, model: str,
     graph = await builder.setup_graph("basic_chatbot")
     
     config = {
+        "recursion_limit": GRAPH_RECURSION_LIMIT,
         "configurable": {"thread_id": thread_id},
         "metadata": {
             "provider": provider,
@@ -211,7 +215,7 @@ async def prepare_chatbot_graph_state(thread_id: str, provider: str, model: str,
     }
     return llm, graph, config, state, existing_messages, resolved_settings
 
-async def execute_chatbot_graph(message: ChatMessage, provider: str, model: str, thread_id: str = "default", prompt_config: dict = None):
+async def execute_chatbot_graph(message: ChatMessage, provider: str, model: str, thread_id: str = "default", prompt_config: dict | None = None):
     """
     Initializes the required base LLM, compiles the basic chatbot StateGraph,
     streams response tokens from the LLM, and updates the memory checkpointer
@@ -314,7 +318,10 @@ async def execute_chatbot_graph(message: ChatMessage, provider: str, model: str,
         user_messages = [m for m in all_messages if isinstance(m, HumanMessage)]
         if user_messages:
             first_content = user_messages[0].content
-            name = first_content[:40] + ("..." if len(first_content) > 40 else "")
+            if isinstance(first_content, str):
+                name = first_content[:40] + ("..." if len(first_content) > 40 else "")
+            else:
+                name = str(first_content)[:40] + "..."
         else:
             name = "New Chat"
         created_at = existing_session.get("created_at") if existing_session else None
@@ -344,7 +351,7 @@ async def execute_chatbot_graph(message: ChatMessage, provider: str, model: str,
     }
     yield f"data: {json.dumps(final_data)}\n\n"
 
-async def get_chatbot_history(provider: str, model: str, thread_id: str = "default", prompt_config: dict = None) -> dict:
+async def get_chatbot_history(provider: str, model: str, thread_id: str = "default", prompt_config: dict | None = None) -> dict:
     """
     Retrieves the full conversation history and saved settings for a thread.
     If it doesn't exist, initializes it with a default system message and settings.

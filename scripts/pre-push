@@ -38,6 +38,40 @@ if [ $LLM_RESULT -ne 0 ]; then
 fi
 
 echo ""
-echo "✅ Success: All tests and LLM verifications passed. Proceeding with push."
+echo "========================================="
+echo "Running Ruff lint checks before pushing..."
+echo "========================================="
+
+# Run Ruff lint
+uv run ruff check .
+
+RUFF_RESULT=$?
+
+if [ $RUFF_RESULT -ne 0 ]; then
+  echo ""
+  echo "❌ Error: Ruff lint checks failed! Push aborted."
+  echo "========================================="
+  exit 1
+fi
+
+echo ""
+echo "========================================="
+echo "Running Mypy type checks before pushing..."
+echo "========================================="
+
+# Run Mypy type-checking
+uv run mypy .
+
+MYPY_RESULT=$?
+
+if [ $MYPY_RESULT -ne 0 ]; then
+  echo ""
+  echo "❌ Error: Mypy type checks failed! Push aborted."
+  echo "========================================="
+  exit 1
+fi
+
+echo ""
+echo "✅ Success: All tests, lints, type checks, and LLM verifications passed. Proceeding with push."
 echo "========================================="
 exit 0

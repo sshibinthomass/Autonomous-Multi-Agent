@@ -1,5 +1,6 @@
 from langchain_core.tools import tool
 
+
 @tool
 def add(a: float, b: float) -> float:
     """Adds two numbers together. Use this tool for mathematical addition."""

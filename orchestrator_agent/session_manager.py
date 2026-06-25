@@ -2,7 +2,8 @@ import json
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional, Any
+from typing import Any, Dict, List, Optional
+
 
 def get_session_dir() -> Path:
     """

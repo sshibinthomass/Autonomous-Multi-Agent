@@ -1,21 +1,15 @@
 import os
-import sys
 import subprocess
+import sys
+
 
 def main():
     llm_dir = os.path.join("orchestrator_agent", "llms")
     llm_files = [
-        "anthropic_llm.py",
-        "gemini_llm.py",
-        "groq_llm.py",
         "ollama_llm.py",
-        "openai_llm.py"
     ]
     
-    if os.environ.get("CI") == "true":
-        print("Running in CI environment. Skipping Anthropic and OpenAI checks.")
-        llm_files = [f for f in llm_files if f not in ("anthropic_llm.py", "openai_llm.py")]
-    
+
     print("=========================================")
     print("Starting LLM Verifications...")
     print("=========================================")

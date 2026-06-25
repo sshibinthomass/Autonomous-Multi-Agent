@@ -1,14 +1,15 @@
 import sys
-from pathlib import Path
 import unittest
-import asyncio
+from pathlib import Path
 
 repo_root = Path(__file__).resolve().parent.parent.parent
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+
 from orchestrator_agent.graphs.graph_builder import GraphBuilder, memory_checkpointer
+
 
 class MockToolCallingLLM:
     """
@@ -59,7 +60,7 @@ class TestGraphTools(unittest.IsolatedAsyncioTestCase):
         }
         
         # Run graph
-        result = await self.graph.ainvoke(initial_state, config)
+        await self.graph.ainvoke(initial_state, config)
         
         # Fetch actual compiled state from checkpointer
         state = await self.graph.aget_state(config)

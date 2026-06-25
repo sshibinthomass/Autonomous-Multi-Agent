@@ -1,17 +1,18 @@
 import sys
-from pathlib import Path
 import unittest
-import asyncio
+from pathlib import Path
 
 # Setup sys.path to find project root
 repo_root = Path(__file__).resolve().parent.parent.parent
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+
 from orchestrator_agent.graphs.graph_builder import GraphBuilder, memory_checkpointer
-from orchestrator_agent.services import to_langchain_messages, to_chat_dict
 from orchestrator_agent.schemas import ChatMessage
+from orchestrator_agent.services import to_langchain_messages
+
 
 class MockLLM:
     """
@@ -142,7 +143,7 @@ class TestBackendMemory(unittest.IsolatedAsyncioTestCase):
         
         # We will create a history with 1 system message and 30 user/assistant messages
         system_msg = SystemMessage(content="System prompt instructions")
-        messages = [system_msg]
+        messages: list[BaseMessage] = [system_msg]
         
         for i in range(15):
             messages.append(HumanMessage(content=f"User msg {i}"))
@@ -162,6 +163,7 @@ class TestBackendMemory(unittest.IsolatedAsyncioTestCase):
         # The total non-system messages passed should be limited to MAX_HISTORY_MESSAGES
         # plus the system message(s)
         self.assertIsNotNone(invoked)
+        assert invoked is not None
         
         # Filters
         non_system_invoked = [m for m in invoked if not isinstance(m, SystemMessage)]

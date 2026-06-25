@@ -1,8 +1,9 @@
 import sys
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi.responses import StreamingResponse
+
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 # Ensure the project root is in python path
 current_file = Path(__file__).resolve()
@@ -11,16 +12,15 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 # Import modular layers
-from orchestrator_agent.config import AVAILABLE_MODELS
-from orchestrator_agent.config import TONES
+from orchestrator_agent.config import AVAILABLE_MODELS, TONES
 from orchestrator_agent.schemas import (
     ChatRequest,
-    PromptConfig,
     CreateSessionRequest,
+    PromptConfig,
     RenameSessionRequest,
-    UpdateSettingsRequest
+    UpdateSettingsRequest,
 )
-from orchestrator_agent.services import execute_chatbot_graph, get_chatbot_history, clear_chatbot_history
+from orchestrator_agent.services import clear_chatbot_history, execute_chatbot_graph, get_chatbot_history
 
 # Initialize FastAPI application
 app = FastAPI(
@@ -122,8 +122,9 @@ def create_new_session(req: CreateSessionRequest):
     """
     try:
         import uuid
-        from orchestrator_agent.session_manager import save_session
+
         from orchestrator_agent.prompts.prompts import get_basic_chatbot_system_prompt
+        from orchestrator_agent.session_manager import save_session
         
         thread_id = f"thread-{uuid.uuid4().hex[:12]}"
         prompt = get_basic_chatbot_system_prompt(name=req.chatbot_name, tone=req.tone)
@@ -164,8 +165,8 @@ def delete_existing_session(thread_id: str):
     Deletes the session on disk and clears from checkpointer.
     """
     try:
-        from orchestrator_agent.session_manager import delete_session
         from orchestrator_agent.services import clear_chatbot_history
+        from orchestrator_agent.session_manager import delete_session
         
         deleted = delete_session(thread_id)
         clear_chatbot_history(thread_id)
@@ -186,9 +187,9 @@ async def update_session_settings(thread_id: str, req: UpdateSettingsRequest):
     """
     import time
     try:
-        from orchestrator_agent.session_manager import load_session, save_session
-        from orchestrator_agent.services import get_base_llm
         from orchestrator_agent.graphs.graph_builder import GraphBuilder
+        from orchestrator_agent.services import get_base_llm
+        from orchestrator_agent.session_manager import load_session, save_session
         
         session = load_session(thread_id)
         if not session:
@@ -227,8 +228,9 @@ async def update_session_settings(thread_id: str, req: UpdateSettingsRequest):
         state = await graph.aget_state(config)
         messages = state.values.get("messages", [])
         if messages:
-            from orchestrator_agent.prompts.prompts import get_basic_chatbot_system_prompt
             from langchain_core.messages import SystemMessage
+
+            from orchestrator_agent.prompts.prompts import get_basic_chatbot_system_prompt
             # Update system message content
             for msg in messages:
                 if isinstance(msg, SystemMessage):

@@ -1,5 +1,7 @@
 import pytest
-from orchestrator_agent.tools.math_tools import add, subtract, multiply, divide
+
+from orchestrator_agent.tools.math_tools import add, divide, multiply, subtract
+
 
 def test_add_operation():
     assert add.invoke({"a": 5, "b": 10}) == 15

@@ -1,6 +1,8 @@
 import os
-from langchain_groq import ChatGroq
+
 import dotenv
+from langchain_groq import ChatGroq
+
 dotenv.load_dotenv()
 
 class GroqLLM:

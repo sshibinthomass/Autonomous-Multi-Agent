@@ -1,0 +1,32 @@
+---
+description: Mandatory coding standards — must follow on every code change
+alwaysApply: true
+---
+
+# Code Quality Standards (Mandatory)
+
+These principles apply to **every** code change in this project. Do not skip or partially apply them.
+
+## 1. Minimize Scope
+
+Use the simplest correct diff. Do not add or change unrelated or unrequested code, especially for question-only or review-only tasks. A focused 5-line change that solves the root problem is strictly better than a 100-line diff.
+
+## 2. Avoid Over-Engineering
+
+Do not over-abstract the code (e.g., one-line helpers that should be inline). Do not add excessive error handling or fallbacks for edge cases that are impossible or extremely unlikely.
+
+## 3. Use Existing Conventions
+
+Read the surrounding code before writing. Match its naming, types, abstractions, import style, and documentation level. Your additions should read as if written by the same author. Reuse and extend existing functions and components rather than reimplementing similar logic. When no convention exists, follow language and framework best practices.
+
+## 4. Comments
+
+Good code should mostly be self-explanatory. Only add comments that explain non-obvious business logic or deep technical details.
+
+## 5. Useful Tests Only
+
+Only add tests if requested or they add meaningful coverage of real behavior. Do not add tests that trivially assert the obvious.
+
+## 6. Python Environment
+
+Always use UV and venv when working with Python. If UV is not present, install it and create a venv.

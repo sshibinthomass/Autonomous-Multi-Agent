@@ -1,6 +1,7 @@
 import os
-from langchain_anthropic import ChatAnthropic
+
 import dotenv
+from langchain_anthropic import ChatAnthropic
 
 dotenv.load_dotenv()
 
@@ -16,7 +17,7 @@ class AnthropicLLM:
             "selected_llm", "claude-haiku-4-5-20251001"
         )
 
-        return ChatAnthropic(api_key=anthropic_api_key, model=selected_anthropic_model)
+        return ChatAnthropic(api_key=anthropic_api_key, model=selected_anthropic_model)  # type: ignore[call-arg]
 
 
 import sys

@@ -123,7 +123,7 @@ To keep the application highly responsive, `App.tsx` manages a centralized serie
 ### 1. Initialization Flow (Component Mount)
 ```mermaid
 graph TD
-    A([App Mounts]) --> B[Fetch GET http://127.0.0.1:8080/api/settings]
+    A([App Mounts]) --> B[Fetch GET http://127.0.0.1:8081/api/settings]
     B --> C{Success?}
     C -- No --> D[Render network connection error banner]
     C -- Yes --> E[Save providers state config]
@@ -139,7 +139,7 @@ When the user types a prompt and submits the chat input:
    - Clear input text field.
    - Set `isLoading = true` (disables input bar and triggers typing dots loading bubble).
 2. **API Dispatch**:
-   - Send `POST` request to `http://127.0.0.1:8080/api/chat` with body:
+   - Send `POST` request to `http://127.0.0.1:8081/api/chat` with body:
      ```json
      {
        "messages": [...allMessages, userMessage],

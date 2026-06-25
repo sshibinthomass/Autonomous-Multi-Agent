@@ -59,7 +59,7 @@ function App() {
   // ── Fetch session list from backend ──────────────────────────────
   const fetchSessions = useCallback(async () => {
     try {
-      const response = await fetch('http://127.0.0.1:8080/api/sessions');
+      const response = await fetch('http://127.0.0.1:8081/api/sessions');
       if (!response.ok) throw new Error('Failed to load sessions');
       const data = await response.json();
       setSessions(data || []);
@@ -76,7 +76,7 @@ function App() {
     saveSetting(STORAGE_KEYS.provider, value);
     if (threadId) {
       try {
-        await fetch(`http://127.0.0.1:8080/api/sessions/${threadId}/settings`, {
+        await fetch(`http://127.0.0.1:8081/api/sessions/${threadId}/settings`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ provider: value })
@@ -93,7 +93,7 @@ function App() {
     saveSetting(STORAGE_KEYS.model, value);
     if (threadId) {
       try {
-        await fetch(`http://127.0.0.1:8080/api/sessions/${threadId}/settings`, {
+        await fetch(`http://127.0.0.1:8081/api/sessions/${threadId}/settings`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ model: value })
@@ -130,7 +130,7 @@ function App() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8080/api/chat/${threadId}/history?provider=${provider}&model=${model}&chatbot_name=${encodeURIComponent(pc.chatbot_name)}&tone=${encodeURIComponent(pc.tone)}`
+        `http://127.0.0.1:8081/api/chat/${threadId}/history?provider=${provider}&model=${model}&chatbot_name=${encodeURIComponent(pc.chatbot_name)}&tone=${encodeURIComponent(pc.tone)}`
       );
       if (!response.ok) throw new Error('Failed to load history');
       const data = await response.json();
@@ -170,7 +170,7 @@ function App() {
     const initialize = async () => {
       try {
         // Fetch provider catalog
-        const response = await fetch('http://127.0.0.1:8080/api/settings');
+        const response = await fetch('http://127.0.0.1:8081/api/settings');
         if (!response.ok) throw new Error('Failed to load settings');
         const data: SettingsResponse = await response.json();
         if (cancelled) return;
@@ -197,7 +197,7 @@ function App() {
           const mod = loadSetting(STORAGE_KEYS.model, 'gpt-4o-mini');
           const pc = loadPromptConfig();
           
-          const createResponse = await fetch('http://127.0.0.1:8080/api/sessions', {
+          const createResponse = await fetch('http://127.0.0.1:8081/api/sessions', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
@@ -224,7 +224,7 @@ function App() {
       } catch (err: any) {
         if (cancelled) return;
         console.error('Error fetching settings/sessions:', err);
-        setErrorMsg('Could not connect to FastAPI server. Make sure the backend is running on port 8080.');
+        setErrorMsg('Could not connect to FastAPI server. Make sure the backend is running on port 8081.');
       }
     };
 
@@ -248,7 +248,7 @@ function App() {
   // ── Create, Rename, Delete session handlers ────────────────────────
   const handleCreateSession = useCallback(async () => {
     try {
-      const response = await fetch('http://127.0.0.1:8080/api/sessions', {
+      const response = await fetch('http://127.0.0.1:8081/api/sessions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -273,7 +273,7 @@ function App() {
 
   const handleRenameSession = useCallback(async (id: string, newName: string) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8080/api/sessions/${id}/rename`, {
+      const response = await fetch(`http://127.0.0.1:8081/api/sessions/${id}/rename`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -291,7 +291,7 @@ function App() {
 
   const handleDeleteSession = useCallback(async (id: string) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8080/api/sessions/${id}`, {
+      const response = await fetch(`http://127.0.0.1:8081/api/sessions/${id}`, {
         method: 'DELETE'
       });
 
@@ -334,7 +334,7 @@ function App() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://127.0.0.1:8080/api/chat', {
+      const response = await fetch('http://127.0.0.1:8081/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -458,13 +458,13 @@ function App() {
   const handleClearHistory = async () => {
     setErrorMsg(null);
     try {
-      const response = await fetch(`http://127.0.0.1:8080/api/chat/${threadId}/clear`, {
+      const response = await fetch(`http://127.0.0.1:8081/api/chat/${threadId}/clear`, {
         method: 'POST',
       });
       if (!response.ok) throw new Error('Failed to clear session on backend');
       
       // Start a fresh session
-      const createResponse = await fetch('http://127.0.0.1:8080/api/sessions', {
+      const createResponse = await fetch('http://127.0.0.1:8081/api/sessions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -493,7 +493,7 @@ function App() {
     updatePromptConfig(newConfig);
     if (threadId) {
       try {
-        await fetch(`http://127.0.0.1:8080/api/sessions/${threadId}/settings`, {
+        await fetch(`http://127.0.0.1:8081/api/sessions/${threadId}/settings`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -1,10 +1,9 @@
-import os
 import unittest
-from unittest.mock import patch, MagicMock, AsyncMock
-import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from orchestrator_agent.services import execute_chatbot_graph
 from orchestrator_agent.schemas import ChatMessage
+from orchestrator_agent.services import execute_chatbot_graph
+
 
 class TestLangfuseIntegration(unittest.IsolatedAsyncioTestCase):
     @patch('orchestrator_agent.services.get_env_variable')
@@ -26,7 +25,8 @@ class TestLangfuseIntegration(unittest.IsolatedAsyncioTestCase):
         mock_graph.aget_state.return_value = mock_state
         
         async def mock_astream(*args, **kwargs):
-            if False: yield
+            if False:
+                yield
         mock_graph.astream_events = mock_astream
         
         config = {
@@ -78,7 +78,8 @@ class TestLangfuseIntegration(unittest.IsolatedAsyncioTestCase):
         mock_graph.aget_state.return_value = mock_state
         
         async def mock_astream(*args, **kwargs):
-            if False: yield
+            if False:
+                yield
         mock_graph.astream_events = mock_astream
         
         config = {

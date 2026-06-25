@@ -147,7 +147,7 @@ This project uses the modern, lightning-fast Python packaging tool `uv`. If you 
 
 ```bash
 # Sync/install project dependencies and start the API
-uv run uvicorn orchestrator_agent.api:app --host 127.0.0.1 --port 8080 --reload
+uv run uvicorn orchestrator_agent.api:app --host 127.0.0.1 --port 8081 --reload
 ```
 
 #### B. Using standard `pip`
@@ -163,10 +163,10 @@ source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
 pip install -e .
 
 # Start the FastAPI server
-uvicorn orchestrator_agent.api:app --host 127.0.0.1 --port 8080 --reload
+uvicorn orchestrator_agent.api:app --host 127.0.0.1 --port 8081 --reload
 ```
 
-The backend server will run at `http://127.0.0.1:8080`.
+The backend server will run at `http://127.0.0.1:8081`.
 
 ---
 
@@ -175,6 +175,7 @@ The backend server will run at `http://127.0.0.1:8080`.
 You can run the frontend either by navigating to the folder or directly from the project root.
 
 #### Option A: Running from the Root Directory (Quickest)
+
 You can use the `--prefix` flag to run `npm` commands for a subfolder without leaving the root directory:
 
 ```bash
@@ -186,6 +187,7 @@ npm run dev --prefix frontend
 ```
 
 #### Option B: Running from the `frontend/` Directory
+
 ```bash
 # Navigate to client folder
 cd frontend
@@ -206,16 +208,21 @@ Open `http://localhost:5173` in your browser to start playing with the agent!
 This project integrates backend unit testing using `pytest`, automated GitHub Actions CI/CD workflows, and local Git `pre-push` hooks to ensure code stability.
 
 ### 1. Running Tests Locally
+
 Tests are structured under [orchestrator_agent/agent_test/](file:///d:/Github-Projects/Autonomous-Multi-Agent/orchestrator_agent/agent_test/). To run the test suite:
+
 ```bash
 uv run pytest
 ```
+
 This runs unit tests covering state checkpointers, schemas, API converters, and session management.
 
 ### 2. Git pre-push Hook Setup
+
 We configure a Git hook that intercepts any `git push` command, runs the test suite locally, and aborts the push if any test fails.
 
 To initialize the hook on your local machine:
+
 - **Windows (PowerShell)**:
   ```powershell
   .\scripts\setup-git-hooks.ps1
@@ -227,12 +234,12 @@ To initialize the hook on your local machine:
   ```
 
 ### 3. Continuous Integration (CI/CD)
+
 A GitHub Actions workflow is defined in [.github/workflows/ci.yml](file:///d:/Github-Projects/Autonomous-Multi-Agent/.github/workflows/ci.yml). It automatically runs the full test suite in an isolated Ubuntu container for every `push` and `pull_request` targeting the `main` or `master` branches.
 
 For more details on the testing design and hook setups, see the detailed [TESTING_SETUP.md](file:///d:/Github-Projects/Autonomous-Multi-Agent/TESTING_SETUP.md).
 
 ---
-
 
 ## 🏛️ Design Patterns Applied
 

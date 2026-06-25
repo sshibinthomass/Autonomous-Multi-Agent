@@ -1,4 +1,5 @@
 import os
+
 import dotenv
 
 # Load environment variables from .env on startup
