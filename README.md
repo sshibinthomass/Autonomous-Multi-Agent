@@ -219,19 +219,22 @@ This runs unit tests covering state checkpointers, schemas, API converters, and 
 
 ### 2. Git pre-push Hook Setup
 
-We configure a Git hook that intercepts any `git push` command, runs the test suite locally, and aborts the push if any test fails.
+We configure a Git hook using **Husky** that intercepts any `git push` command, runs the test suite locally, and aborts the push if any test, lint, or type check fails.
 
 To initialize the hook on your local machine:
 
-- **Windows (PowerShell)**:
-  ```powershell
-  .\scripts\setup-git-hooks.ps1
-  ```
-- **macOS / Linux / Git Bash**:
-  ```bash
-  chmod +x scripts/setup-git-hooks.sh
-  ./scripts/setup-git-hooks.sh
-  ```
+1. Navigate to the `frontend` folder and install dependencies, which automatically sets up the hooks:
+   ```bash
+   cd frontend
+   npm install
+   ```
+   *(If you already have dependencies installed, run `npm run prepare` inside `frontend/` instead).*
+
+2. **Alternative (Python/Backend Developers)**:
+   If you do not have Node/NPM installed, you can manually point Git to the hook directory from the repository root:
+   ```bash
+   git config core.hooksPath frontend/.husky
+   ```
 
 ### 3. Continuous Integration (CI/CD)
 

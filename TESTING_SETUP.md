@@ -14,22 +14,21 @@ This guide provides instructions on how backend testing is structured, how to ru
 
 ## 🛠️ Hook Installation on a New Machine
 
-Git hooks reside inside the local `.git/hooks/` directory, which is excluded from Git version control. Consequently, **every time you clone this repository onto a new machine**, you must initialize the pre-push hook using one of the helper scripts provided in the `scripts/` folder:
+Git hooks are managed via **Husky** located in the `frontend/` directory.
 
-### Option A: Windows (PowerShell)
-Open a PowerShell terminal in the repository root directory and run:
-```powershell
-.\scripts\setup-git-hooks.ps1
-```
-
-### Option B: macOS / Linux / Git Bash
-Open a terminal in the repository root directory and run:
+### Option A: Standard Setup (via Node/NPM)
+Whenever you clone the repository, navigate to the `frontend/` directory and install dependencies. This will automatically configure the Git hooks:
 ```bash
-chmod +x scripts/setup-git-hooks.sh
-./scripts/setup-git-hooks.sh
+cd frontend
+npm install
 ```
+*(If dependencies are already installed, run `npm run prepare` inside `frontend/` instead).*
 
-These scripts copy the version-controlled pre-push template [scripts/pre-push](file:///d:/Github-Projects/Autonomous-Multi-Agent/scripts/pre-push) into `.git/hooks/pre-push` and ensure it is marked executable.
+### Option B: Manual Setup (No Node/NPM Dependency)
+If you do not have Node/NPM installed, you can manually instruct Git to use the version-controlled Husky directory from the repository root:
+```bash
+git config core.hooksPath frontend/.husky
+```
 
 ---
 
