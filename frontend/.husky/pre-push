@@ -1,15 +1,13 @@
 #!/bin/sh
 
-# Pre-push hook to run pytest before pushing code to remote repo.
-# If tests fail, the push is prevented.
+# Pre-push hook to run tests, lints, type checks, and LLM verification before pushing.
+# If any checks fail, the push is aborted.
 
 echo "========================================="
 echo "Running pytest suite before pushing..."
 echo "========================================="
 
-# Run the pytest suite
 uv run pytest
-
 RESULT=$?
 
 if [ $RESULT -ne 0 ]; then
@@ -25,9 +23,7 @@ echo "========================================="
 echo "Running LLM verification before pushing..."
 echo "========================================="
 
-# Run LLM verification
 uv run python scripts/verify_llms.py
-
 LLM_RESULT=$?
 
 if [ $LLM_RESULT -ne 0 ]; then
@@ -42,9 +38,7 @@ echo "========================================="
 echo "Running Ruff lint checks before pushing..."
 echo "========================================="
 
-# Run Ruff lint
 uv run ruff check .
-
 RUFF_RESULT=$?
 
 if [ $RUFF_RESULT -ne 0 ]; then
@@ -59,9 +53,7 @@ echo "========================================="
 echo "Running Mypy type checks before pushing..."
 echo "========================================="
 
-# Run Mypy type-checking
 uv run mypy .
-
 MYPY_RESULT=$?
 
 if [ $MYPY_RESULT -ne 0 ]; then
