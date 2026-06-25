@@ -23,6 +23,8 @@ from orchestrator_agent.llms.ollama_llm import OllamaLLM
 
 # Import LLM wrappers
 from orchestrator_agent.llms.openai_llm import OpenAILLM
+from orchestrator_agent.llms.router_llm import DynamicRouterLLM
+from orchestrator_agent.llms.litellm import LiteLLMChat
 from orchestrator_agent.prompts.prompts import get_basic_chatbot_system_prompt
 from orchestrator_agent.schemas import ChatMessage
 from orchestrator_agent.session_manager import delete_session, load_session, save_session
@@ -105,6 +107,22 @@ def get_base_llm(provider: str, model: str):
         controls["OLLAMA_BASE_URL"] = get_env_variable("OLLAMA_BASE_URL", "http://localhost:11434")
         return OllamaLLM(controls).get_base_llm()
         
+    elif provider == "dynamic":
+        controls["OPENAI_API_KEY"] = get_env_variable("OPENAI_API_KEY")
+        controls["GEMINI_API_KEY"] = get_env_variable("GEMINI_API_KEY")
+        controls["GROQ_API_KEY"] = get_env_variable("GROQ_API_KEY")
+        controls["ANTHROPIC_API_KEY"] = get_env_variable("ANTHROPIC_API_KEY")
+        controls["OLLAMA_BASE_URL"] = get_env_variable("OLLAMA_BASE_URL", "http://localhost:11434")
+        return DynamicRouterLLM(user_controls_input=controls)
+        
+    elif provider == "litellm":
+        controls["OPENAI_API_KEY"] = get_env_variable("OPENAI_API_KEY")
+        controls["GEMINI_API_KEY"] = get_env_variable("GEMINI_API_KEY")
+        controls["GROQ_API_KEY"] = get_env_variable("GROQ_API_KEY")
+        controls["ANTHROPIC_API_KEY"] = get_env_variable("ANTHROPIC_API_KEY")
+        controls["OLLAMA_BASE_URL"] = get_env_variable("OLLAMA_BASE_URL", "http://localhost:11434")
+        return LiteLLMChat(user_controls_input=controls)
+
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported LLM provider: {provider}")
 
