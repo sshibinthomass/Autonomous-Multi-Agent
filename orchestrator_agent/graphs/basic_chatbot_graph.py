@@ -21,14 +21,14 @@ def basic_chatbot_build_graph(graph_builder, llm):
     """
     # 1. Bind mathematical tools to the base LLM instance
     llm_with_tools = llm.bind_tools(math_tools)
-    
+
     # 2. Instantiate basic chatbot node with both base and tools-enabled LLMs
     basic_chatbot_node = BasicChatbotNode(llm, llm_with_tools)
 
     # 3. Add nodes
     graph_builder.add_node("chatbot", basic_chatbot_node.process)
     graph_builder.add_node("tools", ToolNode(math_tools))
-    
+
     # 4. Add edges
     graph_builder.add_edge(START, "chatbot")
     graph_builder.add_conditional_edges("chatbot", tools_condition)

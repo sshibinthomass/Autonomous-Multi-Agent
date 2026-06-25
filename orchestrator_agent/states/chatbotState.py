@@ -16,4 +16,3 @@ class ChatbotState(TypedDict, total=False):
     chatbot_name: str
     tone: str
     date_time: str
-

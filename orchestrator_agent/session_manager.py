@@ -13,12 +13,14 @@ def get_session_dir() -> Path:
     p.mkdir(parents=True, exist_ok=True)
     return p
 
+
 def get_session_path(thread_id: str) -> Path:
     """
     Returns the file path for a given thread_id, preventing directory traversal.
     """
     safe_id = Path(thread_id).name
     return get_session_dir() / f"{safe_id}.json"
+
 
 def load_session(thread_id: str) -> Optional[Dict[str, Any]]:
     """
@@ -33,6 +35,7 @@ def load_session(thread_id: str) -> Optional[Dict[str, Any]]:
             print(f"Error loading session {thread_id}: {e}")
     return None
 
+
 def save_session(
     thread_id: str,
     name: str,
@@ -43,14 +46,14 @@ def save_session(
     tone: str,
     date_time: Optional[str] = None,
     created_at: Optional[float] = None,
-    updated_at: Optional[float] = None
+    updated_at: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Saves or updates a session configuration and history in a JSON file.
     """
     path = get_session_path(thread_id)
     now = time.time()
-    
+
     session_data = {
         "id": thread_id,
         "name": name,
@@ -61,15 +64,16 @@ def save_session(
         "chatbot_name": chatbot_name,
         "tone": tone,
         "date_time": date_time or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "messages": messages
+        "messages": messages,
     }
-    
+
     try:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(session_data, f, indent=2, ensure_ascii=False)
     except Exception as e:
         print(f"Error saving session {thread_id}: {e}")
     return session_data
+
 
 def list_sessions() -> List[Dict[str, Any]]:
     """
@@ -81,23 +85,26 @@ def list_sessions() -> List[Dict[str, Any]]:
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                sessions.append({
-                    "id": data.get("id"),
-                    "name": data.get("name", "New Chat"),
-                    "created_at": data.get("created_at", time.time()),
-                    "updated_at": data.get("updated_at", time.time()),
-                    "provider": data.get("provider", "openai"),
-                    "model": data.get("model", "gpt-4o-mini"),
-                    "chatbot_name": data.get("chatbot_name", "Jarvis"),
-                    "tone": data.get("tone", "friendly"),
-                    "date_time": data.get("date_time", "")
-                })
+                sessions.append(
+                    {
+                        "id": data.get("id"),
+                        "name": data.get("name", "New Chat"),
+                        "created_at": data.get("created_at", time.time()),
+                        "updated_at": data.get("updated_at", time.time()),
+                        "provider": data.get("provider", "openai"),
+                        "model": data.get("model", "gpt-4o-mini"),
+                        "chatbot_name": data.get("chatbot_name", "Jarvis"),
+                        "tone": data.get("tone", "friendly"),
+                        "date_time": data.get("date_time", ""),
+                    }
+                )
         except Exception as e:
             print(f"Error reading session file {path}: {e}")
-            
+
     # Sort by updated_at descending
     sessions.sort(key=lambda s: s.get("updated_at", 0), reverse=True)
     return sessions
+
 
 def delete_session(thread_id: str) -> bool:
     """
@@ -111,6 +118,7 @@ def delete_session(thread_id: str) -> bool:
         except Exception as e:
             print(f"Error deleting session {thread_id}: {e}")
     return False
+
 
 def rename_session(thread_id: str, new_name: str) -> Optional[Dict[str, Any]]:
     """

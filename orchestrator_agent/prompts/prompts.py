@@ -35,10 +35,10 @@ def get_llm_router_prompt(user_query: str) -> str:
     Returns the routing prompt for the dynamic LLM selector.
     """
     from orchestrator_agent.config import PRIMARY_COMPLEX_MODEL, PRIMARY_SIMPLE_MODEL
-    
+
     simple_provider, simple_model = PRIMARY_SIMPLE_MODEL
     complex_provider, complex_model = PRIMARY_COMPLEX_MODEL
-    
+
     return f"""You are an LLM Router. Analyze the user's latest query and determine the most appropriate model to handle it.
 You must return your output in JSON format conforming to the expected schema.
 

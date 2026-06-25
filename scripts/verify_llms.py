@@ -8,12 +8,11 @@ def main():
     llm_files = [
         "ollama_llm.py",
     ]
-    
 
     print("=========================================")
     print("Starting LLM Verifications...")
     print("=========================================")
-    
+
     failed = False
     for llm_file in llm_files:
         path = os.path.join(llm_dir, llm_file)
@@ -21,16 +20,12 @@ def main():
             print(f"❌ {llm_file} not found at {path}!")
             failed = True
             continue
-            
+
         print(f"Running verification for {llm_file}...")
-        
+
         # Run the script as a subprocess using the current python executable
-        result = subprocess.run(
-            [sys.executable, path],
-            capture_output=True,
-            text=True
-        )
-        
+        result = subprocess.run([sys.executable, path], capture_output=True, text=True)
+
         if result.returncode != 0:
             print(f"❌ {llm_file} verification FAILED!")
             if result.stdout:
@@ -43,16 +38,17 @@ def main():
             print(f"✅ {llm_file} verification PASSED.")
             if result.stdout:
                 # Optionally print a truncated version of the success response or just log it
-                first_line = result.stdout.strip().split('\n')[0]
+                first_line = result.stdout.strip().split("\n")[0]
                 print(f"   Output snippet: {first_line}")
             print("-----------------------------------------")
-            
+
     if failed:
         print("❌ Verification failed! One or more LLMs had errors.")
         sys.exit(1)
     else:
         print("✅ All LLMs verified successfully!")
         sys.exit(0)
+
 
 if __name__ == "__main__":
     main()

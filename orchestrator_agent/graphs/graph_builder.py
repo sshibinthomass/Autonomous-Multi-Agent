@@ -61,7 +61,6 @@ if __name__ == "__main__":
 
         graph_builder = GraphBuilder(llm)
 
-
         # Setup graph with tools
         graph = await graph_builder.setup_graph("basic_chatbot")
 
@@ -69,17 +68,12 @@ if __name__ == "__main__":
         initial_state = {
             "messages": [
                 SystemMessage(content="You are a helpful assistant."),
-                HumanMessage(
-                    content="Use preplexity to give me today's news in india?"
-                ),
+                HumanMessage(content="Use preplexity to give me today's news in india?"),
             ]
         }
 
         # Run the graph and print the output (use ainvoke for async graph with thread config)
-        result = await graph.ainvoke(
-            initial_state,
-            config={"configurable": {"thread_id": "cli-test-thread"}}
-        )
+        result = await graph.ainvoke(initial_state, config={"configurable": {"thread_id": "cli-test-thread"}})
         print("Graph Output:", result)
 
     # Run the async main function

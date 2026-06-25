@@ -54,11 +54,7 @@ class BasicChatbotNode:
         messages = state.get("messages", [])
         input_messages = prepare_messages_for_llm(messages)
 
-        llm = (
-            self.base_llm
-            if tool_calls_in_current_turn(messages) >= MAX_TOOL_ITERATIONS
-            else self.llm_with_tools
-        )
+        llm = self.base_llm if tool_calls_in_current_turn(messages) >= MAX_TOOL_ITERATIONS else self.llm_with_tools
         response = llm.invoke(input_messages)
         return {"messages": [response]}
 
@@ -74,10 +70,12 @@ if __name__ == "__main__":
     }
     llm = GroqLLM(user_controls_input).get_base_llm()
     node = BasicChatbotNode(llm)
-    result = node.process({
-        "messages": [
-            SystemMessage(content="You are a helpful and efficient assistant."),
-            HumanMessage(content="Hi"),
-        ]
-    })
+    result = node.process(
+        {
+            "messages": [
+                SystemMessage(content="You are a helpful and efficient assistant."),
+                HumanMessage(content="Hi"),
+            ]
+        }
+    )
     print("Basic Chatbot Node Result:", result)

@@ -19,12 +19,12 @@ from orchestrator_agent.graphs.graph_builder import GraphBuilder, memory_checkpo
 from orchestrator_agent.llms.anthropic_llm import AnthropicLLM
 from orchestrator_agent.llms.gemini_llm import GeminiLLM
 from orchestrator_agent.llms.groq_llm import GroqLLM
+from orchestrator_agent.llms.litellm import LiteLLMChat
 from orchestrator_agent.llms.ollama_llm import OllamaLLM
 
 # Import LLM wrappers
 from orchestrator_agent.llms.openai_llm import OpenAILLM
 from orchestrator_agent.llms.router_llm import DynamicRouterLLM
-from orchestrator_agent.llms.litellm import LiteLLMChat
 from orchestrator_agent.prompts.prompts import get_basic_chatbot_system_prompt
 from orchestrator_agent.schemas import ChatMessage
 from orchestrator_agent.session_manager import delete_session, load_session, save_session
@@ -43,7 +43,7 @@ def to_chat_dict(message) -> dict:
         role = "tool"
     else:
         role = "user"
-        
+
     content = message.content
     if isinstance(content, list):
         text_parts = []
@@ -57,20 +57,21 @@ def to_chat_dict(message) -> dict:
         content = ""
 
     dct = {"role": role, "content": content}
-    
+
     if isinstance(message, AIMessage) and message.tool_calls:
         dct["tool_calls"] = message.tool_calls
     if isinstance(message, ToolMessage):
         dct["tool_call_id"] = message.tool_call_id
         dct["name"] = message.name
-    
+
     timestamp = message.additional_kwargs.get("timestamp")
     if not timestamp:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         message.additional_kwargs["timestamp"] = timestamp
-        
+
     dct["timestamp"] = timestamp
     return dct
+
 
 def get_base_llm(provider: str, model: str):
     """
@@ -78,35 +79,35 @@ def get_base_llm(provider: str, model: str):
     LangChain wrapper class, loading credentials from .env.
     """
     controls = {"selected_llm": model}
-    
+
     if provider == "openai":
         controls["OPENAI_API_KEY"] = get_env_variable("OPENAI_API_KEY")
         if not controls["OPENAI_API_KEY"]:
             raise HTTPException(status_code=400, detail="OpenAI API Key is missing. Add it to .env.")
         return OpenAILLM(controls).get_base_llm()
-        
+
     elif provider == "gemini":
         controls["GEMINI_API_KEY"] = get_env_variable("GEMINI_API_KEY")
         if not controls["GEMINI_API_KEY"]:
             raise HTTPException(status_code=400, detail="Gemini API Key is missing. Add it to .env.")
         return GeminiLLM(controls).get_base_llm()
-        
+
     elif provider == "groq":
         controls["GROQ_API_KEY"] = get_env_variable("GROQ_API_KEY")
         if not controls["GROQ_API_KEY"]:
             raise HTTPException(status_code=400, detail="Groq API Key is missing. Add it to .env.")
         return GroqLLM(controls).get_base_llm()
-        
+
     elif provider == "anthropic":
         controls["ANTHROPIC_API_KEY"] = get_env_variable("ANTHROPIC_API_KEY")
         if not controls["ANTHROPIC_API_KEY"]:
             raise HTTPException(status_code=400, detail="Anthropic API Key is missing. Add it to .env.")
         return AnthropicLLM(controls).get_base_llm()
-        
+
     elif provider == "ollama":
         controls["OLLAMA_BASE_URL"] = get_env_variable("OLLAMA_BASE_URL", "http://localhost:11434")
         return OllamaLLM(controls).get_base_llm()
-        
+
     elif provider == "dynamic":
         controls["OPENAI_API_KEY"] = get_env_variable("OPENAI_API_KEY")
         controls["GEMINI_API_KEY"] = get_env_variable("GEMINI_API_KEY")
@@ -114,7 +115,7 @@ def get_base_llm(provider: str, model: str):
         controls["ANTHROPIC_API_KEY"] = get_env_variable("ANTHROPIC_API_KEY")
         controls["OLLAMA_BASE_URL"] = get_env_variable("OLLAMA_BASE_URL", "http://localhost:11434")
         return DynamicRouterLLM(user_controls_input=controls)
-        
+
     elif provider == "litellm":
         controls["OPENAI_API_KEY"] = get_env_variable("OPENAI_API_KEY")
         controls["GEMINI_API_KEY"] = get_env_variable("GEMINI_API_KEY")
@@ -125,6 +126,7 @@ def get_base_llm(provider: str, model: str):
 
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported LLM provider: {provider}")
+
 
 def to_langchain_messages(messages: List[ChatMessage]):
     """
@@ -142,10 +144,15 @@ def to_langchain_messages(messages: List[ChatMessage]):
         elif msg.role == "tool":
             tool_call_id = msg.tool_call_id if hasattr(msg, "tool_call_id") and msg.tool_call_id else ""
             name = msg.name if hasattr(msg, "name") and msg.name else ""
-            converted.append(ToolMessage(content=msg.content, tool_call_id=tool_call_id, name=name, additional_kwargs=additional_kwargs))
+            converted.append(
+                ToolMessage(
+                    content=msg.content, tool_call_id=tool_call_id, name=name, additional_kwargs=additional_kwargs
+                )
+            )
         else:
             converted.append(HumanMessage(content=msg.content, additional_kwargs=additional_kwargs))
     return converted
+
 
 async def prepare_chatbot_graph_state(thread_id: str, provider: str, model: str, chatbot_name: str, tone: str):
     """
@@ -167,7 +174,7 @@ async def prepare_chatbot_graph_state(thread_id: str, provider: str, model: str,
     # 2. Build and compile the graph (to resolve checkpointer and configuration)
     builder = GraphBuilder(model=llm)
     graph = await builder.setup_graph("basic_chatbot")
-    
+
     config = {
         "recursion_limit": GRAPH_RECURSION_LIMIT,
         "configurable": {"thread_id": thread_id},
@@ -177,63 +184,72 @@ async def prepare_chatbot_graph_state(thread_id: str, provider: str, model: str,
             "chatbot_name": chatbot_name,
             "tone": tone,
             "langfuse_session_id": thread_id,
-            "langfuse_trace_name": f"agent-{chatbot_name}"
+            "langfuse_trace_name": f"agent-{chatbot_name}",
         },
-        "tags": [provider, model, tone]
+        "tags": [provider, model, tone],
     }
-    
+
     # 3. Check for existing messages in state
     state = await graph.aget_state(config)
     existing_messages = state.values.get("messages", [])
-    
+
     state_date_time = state.values.get("date_time")
-    
+
     # State Persistence Recovery Guard:
-    # Since LangGraph's MemorySaver checkpointer resides entirely in RAM, any server restart 
+    # Since LangGraph's MemorySaver checkpointer resides entirely in RAM, any server restart
     # or python process reload (such as hot-reloads) completely clears the checkpointer.
     # To recover context, if the checkpointer has no record of the thread but a persistent JSON
-    # history exists on disk, we lazily restore the messages and LLM configuration back 
+    # history exists on disk, we lazily restore the messages and LLM configuration back
     # into the checkpointer state. This preserves assistant memory continuity seamlessly.
     if not existing_messages:
         session = load_session(thread_id)
         if session:
-            seeded_messages = to_langchain_messages([
-                ChatMessage(
-                    role=m["role"],
-                    content=m["content"],
-                    timestamp=m.get("timestamp"),
-                    tool_calls=m.get("tool_calls"),
-                    tool_call_id=m.get("tool_call_id"),
-                    name=m.get("name")
-                )
-                for m in session.get("messages", [])
-            ])
+            seeded_messages = to_langchain_messages(
+                [
+                    ChatMessage(
+                        role=m["role"],
+                        content=m["content"],
+                        timestamp=m.get("timestamp"),
+                        tool_calls=m.get("tool_calls"),
+                        tool_call_id=m.get("tool_call_id"),
+                        name=m.get("name"),
+                    )
+                    for m in session.get("messages", [])
+                ]
+            )
             state_date_time = session.get("date_time") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            await graph.aupdate_state(config, {
-                "messages": seeded_messages,
-                "provider": session.get("provider", provider),
-                "model": session.get("model", model),
-                "chatbot_name": session.get("chatbot_name", chatbot_name),
-                "tone": session.get("tone", tone),
-                "date_time": state_date_time
-            }, as_node="chatbot")
+            await graph.aupdate_state(
+                config,
+                {
+                    "messages": seeded_messages,
+                    "provider": session.get("provider", provider),
+                    "model": session.get("model", model),
+                    "chatbot_name": session.get("chatbot_name", chatbot_name),
+                    "tone": session.get("tone", tone),
+                    "date_time": state_date_time,
+                },
+                as_node="chatbot",
+            )
             # Reload graph state from the checkpointer to capture the newly seeded values
             state = await graph.aget_state(config)
             existing_messages = state.values.get("messages", [])
-            
+
     if not state_date_time:
         state_date_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
+
     resolved_settings = {
         "provider": provider,
         "model": model,
         "chatbot_name": chatbot_name,
         "tone": tone,
-        "date_time": state_date_time
+        "date_time": state_date_time,
     }
     return llm, graph, config, state, existing_messages, resolved_settings
 
-async def execute_chatbot_graph(message: ChatMessage, provider: str, model: str, thread_id: str = "default", prompt_config: dict | None = None):
+
+async def execute_chatbot_graph(
+    message: ChatMessage, provider: str, model: str, thread_id: str = "default", prompt_config: dict | None = None
+):
     """
     Initializes the required base LLM, compiles the basic chatbot StateGraph,
     streams response tokens from the LLM, and updates the memory checkpointer
@@ -247,23 +263,20 @@ async def execute_chatbot_graph(message: ChatMessage, provider: str, model: str,
 
     # Call unified helper to resolve LLM, compile graph, and seed checkpointer if needed
     llm, graph, config, state, existing_messages, settings = await prepare_chatbot_graph_state(
-        thread_id=thread_id,
-        provider=provider,
-        model=model,
-        chatbot_name=chatbot_name,
-        tone=tone
+        thread_id=thread_id, provider=provider, model=model, chatbot_name=chatbot_name, tone=tone
     )
     resolved_provider = settings["provider"]
     resolved_model = settings["model"]
     resolved_chatbot_name = settings["chatbot_name"]
     resolved_tone = settings["tone"]
-    
+
     # Setup optional Langfuse tracing callback for graph execution
     lf_public = get_env_variable("LANGFUSE_PUBLIC_KEY")
     lf_secret = get_env_variable("LANGFUSE_SECRET_KEY")
     if lf_public and lf_secret:
         try:
             from langfuse.langchain import CallbackHandler
+
             lf_handler = CallbackHandler()
             config["callbacks"] = [lf_handler]
             print(f"Langfuse tracing enabled for session: {thread_id}")
@@ -277,13 +290,13 @@ async def execute_chatbot_graph(message: ChatMessage, provider: str, model: str,
         if not any(isinstance(m, SystemMessage) for m in langchain_messages):
             prompt = get_basic_chatbot_system_prompt(name=resolved_chatbot_name, tone=resolved_tone)
             langchain_messages.insert(0, SystemMessage(content=prompt))
-            
+
     input_state = {
         "messages": langchain_messages,
         "provider": resolved_provider,
         "model": resolved_model,
         "chatbot_name": resolved_chatbot_name,
-        "tone": resolved_tone
+        "tone": resolved_tone,
     }
 
     # 5. Stream the response using graph.astream_events
@@ -313,21 +326,25 @@ async def execute_chatbot_graph(message: ChatMessage, provider: str, model: str,
     # 6. Save current settings in state checkpoint
     current_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     state_config = {k: v for k, v in config.items() if k != "callbacks"}
-    await graph.aupdate_state(state_config, {
-        "provider": resolved_provider,
-        "model": resolved_model,
-        "chatbot_name": resolved_chatbot_name,
-        "tone": resolved_tone,
-        "date_time": current_dt
-    }, as_node="chatbot")
-    
+    await graph.aupdate_state(
+        state_config,
+        {
+            "provider": resolved_provider,
+            "model": resolved_model,
+            "chatbot_name": resolved_chatbot_name,
+            "tone": resolved_tone,
+            "date_time": current_dt,
+        },
+        as_node="chatbot",
+    )
+
     # 7. Retrieve full updated messages and settings state
     updated_state = await graph.aget_state(state_config)
     all_messages = updated_state.values.get("messages", [])
-    
+
     # Save/update session on disk
     existing_session = load_session(thread_id)
-    
+
     if existing_session and existing_session.get("name") != "New Chat":
         name = existing_session.get("name")
         created_at = existing_session.get("created_at")
@@ -343,7 +360,7 @@ async def execute_chatbot_graph(message: ChatMessage, provider: str, model: str,
         else:
             name = "New Chat"
         created_at = existing_session.get("created_at") if existing_session else None
-        
+
     save_session(
         thread_id=thread_id,
         name=name,
@@ -353,9 +370,9 @@ async def execute_chatbot_graph(message: ChatMessage, provider: str, model: str,
         chatbot_name=resolved_chatbot_name,
         tone=resolved_tone,
         date_time=updated_state.values.get("date_time", current_dt),
-        created_at=created_at
+        created_at=created_at,
     )
-    
+
     final_data = {
         "type": "done",
         "messages": [to_chat_dict(m) for m in all_messages],
@@ -364,12 +381,15 @@ async def execute_chatbot_graph(message: ChatMessage, provider: str, model: str,
             "model": updated_state.values.get("model", resolved_model),
             "chatbot_name": updated_state.values.get("chatbot_name", resolved_chatbot_name),
             "tone": updated_state.values.get("tone", resolved_tone),
-            "date_time": updated_state.values.get("date_time", current_dt)
-        }
+            "date_time": updated_state.values.get("date_time", current_dt),
+        },
     }
     yield f"data: {json.dumps(final_data)}\n\n"
 
-async def get_chatbot_history(provider: str, model: str, thread_id: str = "default", prompt_config: dict | None = None) -> dict:
+
+async def get_chatbot_history(
+    provider: str, model: str, thread_id: str = "default", prompt_config: dict | None = None
+) -> dict:
     """
     Retrieves the full conversation history and saved settings for a thread.
     If it doesn't exist, initializes it with a default system message and settings.
@@ -381,11 +401,7 @@ async def get_chatbot_history(provider: str, model: str, thread_id: str = "defau
 
     # Call unified helper to resolve LLM, compile graph, and seed checkpointer if needed
     llm, graph, config, state, messages, settings = await prepare_chatbot_graph_state(
-        thread_id=thread_id,
-        provider=provider,
-        model=model,
-        chatbot_name=chatbot_name,
-        tone=tone
+        thread_id=thread_id, provider=provider, model=model, chatbot_name=chatbot_name, tone=tone
     )
     resolved_provider = settings["provider"]
     resolved_model = settings["model"]
@@ -398,17 +414,21 @@ async def get_chatbot_history(provider: str, model: str, thread_id: str = "defau
         prompt = get_basic_chatbot_system_prompt(name=resolved_chatbot_name, tone=resolved_tone)
         system_msg = SystemMessage(content=prompt)
         current_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        await graph.aupdate_state(config, {
-            "messages": [system_msg],
-            "provider": resolved_provider,
-            "model": resolved_model,
-            "chatbot_name": resolved_chatbot_name,
-            "tone": resolved_tone,
-            "date_time": current_dt
-        }, as_node="chatbot")
+        await graph.aupdate_state(
+            config,
+            {
+                "messages": [system_msg],
+                "provider": resolved_provider,
+                "model": resolved_model,
+                "chatbot_name": resolved_chatbot_name,
+                "tone": resolved_tone,
+                "date_time": current_dt,
+            },
+            as_node="chatbot",
+        )
         state = await graph.aget_state(config)
         messages = [system_msg]
-        
+
         save_session(
             thread_id=thread_id,
             name="New Chat",
@@ -417,9 +437,9 @@ async def get_chatbot_history(provider: str, model: str, thread_id: str = "defau
             model=resolved_model,
             chatbot_name=resolved_chatbot_name,
             tone=resolved_tone,
-            date_time=current_dt
+            date_time=current_dt,
         )
-            
+
     # B. If thread was previously active and has saved settings, dynamically reload/compile with those settings!
     saved_provider = state.values.get("provider")
     saved_model = state.values.get("model")
@@ -429,12 +449,12 @@ async def get_chatbot_history(provider: str, model: str, thread_id: str = "defau
             provider=saved_provider,
             model=saved_model,
             chatbot_name=resolved_chatbot_name,
-            tone=resolved_tone
+            tone=resolved_tone,
         )
         # Re-resolve active settings
         resolved_provider = settings["provider"]
         resolved_model = settings["model"]
-        
+
     # Check if we need to dynamically update the system prompt in the checkpointer
     saved_chatbot_name = state.values.get("chatbot_name")
     saved_tone = state.values.get("tone")
@@ -443,16 +463,16 @@ async def get_chatbot_history(provider: str, model: str, thread_id: str = "defau
             if isinstance(msg, SystemMessage):
                 new_prompt = get_basic_chatbot_system_prompt(name=resolved_chatbot_name, tone=resolved_tone)
                 msg.content = new_prompt
-                await graph.aupdate_state(config, {
-                    "messages": [msg],
-                    "chatbot_name": resolved_chatbot_name,
-                    "tone": resolved_tone
-                }, as_node="chatbot")
+                await graph.aupdate_state(
+                    config,
+                    {"messages": [msg], "chatbot_name": resolved_chatbot_name, "tone": resolved_tone},
+                    as_node="chatbot",
+                )
                 break
         # Reload state to fetch the updated messages
         state = await graph.aget_state(config)
         messages = state.values.get("messages", [])
-        
+
         # Keep JSON file in sync with system prompt update
         existing_session = load_session(thread_id)
         name = existing_session.get("name", "New Chat") if existing_session else "New Chat"
@@ -466,9 +486,9 @@ async def get_chatbot_history(provider: str, model: str, thread_id: str = "defau
             chatbot_name=resolved_chatbot_name,
             tone=resolved_tone,
             date_time=state.values.get("date_time", settings["date_time"]),
-            created_at=created_at
+            created_at=created_at,
         )
-        
+
     return {
         "messages": [to_chat_dict(m) for m in messages],
         "settings": {
@@ -476,9 +496,10 @@ async def get_chatbot_history(provider: str, model: str, thread_id: str = "defau
             "model": state.values.get("model", resolved_model),
             "chatbot_name": state.values.get("chatbot_name", resolved_chatbot_name),
             "tone": state.values.get("tone", resolved_tone),
-            "date_time": state.values.get("date_time", settings["date_time"])
-        }
+            "date_time": state.values.get("date_time", settings["date_time"]),
+        },
     }
+
 
 def clear_chatbot_history(thread_id: str) -> None:
     """

@@ -18,9 +18,7 @@ class GeminiLLM:
         """Return the base Gemini LLM instance"""
         gemini_api_key = self.user_controls_input["GEMINI_API_KEY"]
         selected_gemini_model = self.user_controls_input["selected_llm"]
-        return ChatGoogleGenerativeAI(
-            api_key=gemini_api_key, model=selected_gemini_model
-        )
+        return ChatGoogleGenerativeAI(api_key=gemini_api_key, model=selected_gemini_model)
 
 
 import sys

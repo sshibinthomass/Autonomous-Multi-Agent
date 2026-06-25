@@ -11,10 +11,8 @@ class OllamaLLM:
     def get_base_llm(self):
         """Return the base Ollama LLM instance"""
         selected_ollama_model = self.user_controls_input["selected_llm"]
-        ollama_base_url = self.user_controls_input.get(
-            "OLLAMA_BASE_URL", "http://localhost:11434"
-        )
-        return ChatOllama(model=selected_ollama_model, base_url=ollama_base_url)   
+        ollama_base_url = self.user_controls_input.get("OLLAMA_BASE_URL", "http://localhost:11434")
+        return ChatOllama(model=selected_ollama_model, base_url=ollama_base_url)
 
 
 import sys

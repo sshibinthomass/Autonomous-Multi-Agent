@@ -13,9 +13,7 @@ class OpenAILLM:
     def get_base_llm(self):
         """Return the base ChatOpenAI LLM instance"""
         openai_api_key = self.user_controls_input.get("OPENAI_API_KEY", "")
-        selected_openai_model = self.user_controls_input.get(
-            "selected_llm", "gpt-4.1-mini"
-        )
+        selected_openai_model = self.user_controls_input.get("selected_llm", "gpt-4.1-mini")
         return ChatOpenAI(api_key=openai_api_key, model=selected_openai_model)
 
 
@@ -24,9 +22,7 @@ import sys
 if __name__ == "__main__":
     # Example user_controls_input
     user_controls_input = {
-        "OPENAI_API_KEY": os.getenv(
-            "OPENAI_API_KEY", ""
-        ),  # Use env var or set your key here
+        "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", ""),  # Use env var or set your key here
         "selected_llm": "gpt-4.1-mini",  # Replace with a valid model for your OpenAI account
     }
 

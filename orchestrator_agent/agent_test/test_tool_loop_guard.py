@@ -20,11 +20,13 @@ class ToolsBoundLLM:
         self.base.tool_rounds += 1
         return AIMessage(
             content="",
-            tool_calls=[{
-                "name": "add",
-                "args": {"a": self.base.tool_rounds, "b": 1},
-                "id": f"call_{self.base.tool_rounds}",
-            }],
+            tool_calls=[
+                {
+                    "name": "add",
+                    "args": {"a": self.base.tool_rounds, "b": 1},
+                    "id": f"call_{self.base.tool_rounds}",
+                }
+            ],
         )
 
 

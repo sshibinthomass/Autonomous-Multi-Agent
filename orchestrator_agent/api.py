@@ -26,7 +26,7 @@ from orchestrator_agent.services import clear_chatbot_history, execute_chatbot_g
 app = FastAPI(
     title="Autonomous Multi-Agent Orchestrator API",
     description="Clean, modular API for running agent StateGraphs.",
-    version="2.0.0"
+    version="2.0.0",
 )
 
 # Enable CORS for frontend integration
@@ -38,6 +38,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/api/settings")
 def get_settings():
     """
@@ -45,14 +46,10 @@ def get_settings():
     This lets the React frontend dynamically build settings dropdowns.
     """
     return {
-        "providers": {
-            provider: {
-                "models": AVAILABLE_MODELS[provider]
-            }
-            for provider in AVAILABLE_MODELS
-        },
-        "tones": TONES
+        "providers": {provider: {"models": AVAILABLE_MODELS[provider]} for provider in AVAILABLE_MODELS},
+        "tones": TONES,
     }
+
 
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
@@ -67,15 +64,16 @@ async def chat(request: ChatRequest):
             provider=request.provider,
             model=request.model,
             thread_id=request.thread_id,
-            prompt_config=request.prompt_config.dict()
+            prompt_config=request.prompt_config.dict(),
         )
         return StreamingResponse(generator, media_type="text/event-stream")
-        
+
     except HTTPException as he:
         raise he
     except Exception as e:
         # Gracefully handle validation and runtime exceptions
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/chat/{thread_id}/history")
 async def get_history(thread_id: str, provider: str, model: str, prompt_config: PromptConfig = Depends()):
@@ -91,6 +89,7 @@ async def get_history(thread_id: str, provider: str, model: str, prompt_config: 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/api/chat/{thread_id}/clear")
 def clear_history(thread_id: str):
     """
@@ -104,6 +103,7 @@ def clear_history(thread_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/api/sessions")
 def get_sessions_list():
     """
@@ -111,9 +111,11 @@ def get_sessions_list():
     """
     try:
         from orchestrator_agent.session_manager import list_sessions
+
         return list_sessions()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/api/sessions")
 def create_new_session(req: CreateSessionRequest):
@@ -125,11 +127,11 @@ def create_new_session(req: CreateSessionRequest):
 
         from orchestrator_agent.prompts.prompts import get_basic_chatbot_system_prompt
         from orchestrator_agent.session_manager import save_session
-        
+
         thread_id = f"thread-{uuid.uuid4().hex[:12]}"
         prompt = get_basic_chatbot_system_prompt(name=req.chatbot_name, tone=req.tone)
         system_message = {"role": "system", "content": prompt}
-        
+
         session = save_session(
             thread_id=thread_id,
             name="New Chat",
@@ -137,11 +139,12 @@ def create_new_session(req: CreateSessionRequest):
             provider=req.provider,
             model=req.model,
             chatbot_name=req.chatbot_name,
-            tone=req.tone
+            tone=req.tone,
         )
         return session
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/api/sessions/{thread_id}/rename")
 def rename_existing_session(thread_id: str, req: RenameSessionRequest):
@@ -150,6 +153,7 @@ def rename_existing_session(thread_id: str, req: RenameSessionRequest):
     """
     try:
         from orchestrator_agent.session_manager import rename_session
+
         session = rename_session(thread_id, req.name)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
@@ -159,6 +163,7 @@ def rename_existing_session(thread_id: str, req: RenameSessionRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.delete("/api/sessions/{thread_id}")
 def delete_existing_session(thread_id: str):
     """
@@ -167,10 +172,10 @@ def delete_existing_session(thread_id: str):
     try:
         from orchestrator_agent.services import clear_chatbot_history
         from orchestrator_agent.session_manager import delete_session
-        
+
         deleted = delete_session(thread_id)
         clear_chatbot_history(thread_id)
-        
+
         if not deleted:
             raise HTTPException(status_code=404, detail="Session not found")
         return {"status": "success", "detail": f"Session {thread_id} deleted."}
@@ -179,6 +184,7 @@ def delete_existing_session(thread_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.put("/api/sessions/{thread_id}/settings")
 async def update_session_settings(thread_id: str, req: UpdateSettingsRequest):
     """
@@ -186,15 +192,16 @@ async def update_session_settings(thread_id: str, req: UpdateSettingsRequest):
     Also synchronizes the state checkpointer and system prompt.
     """
     import time
+
     try:
         from orchestrator_agent.graphs.graph_builder import GraphBuilder
         from orchestrator_agent.services import get_base_llm
         from orchestrator_agent.session_manager import load_session, save_session
-        
+
         session = load_session(thread_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
-            
+
         if req.provider is not None:
             session["provider"] = req.provider
         if req.model is not None:
@@ -203,7 +210,7 @@ async def update_session_settings(thread_id: str, req: UpdateSettingsRequest):
             session["chatbot_name"] = req.chatbot_name
         if req.tone is not None:
             session["tone"] = req.tone
-            
+
         # Re-save to disk
         save_session(
             thread_id=thread_id,
@@ -215,15 +222,15 @@ async def update_session_settings(thread_id: str, req: UpdateSettingsRequest):
             tone=session["tone"],
             date_time=session.get("date_time"),
             created_at=session.get("created_at"),
-            updated_at=time.time()
+            updated_at=time.time(),
         )
-        
+
         # Synchronize checkpointer memory
         llm = get_base_llm(session["provider"], session["model"])
         builder = GraphBuilder(model=llm)
         graph = await builder.setup_graph("basic_chatbot")
         config = {"configurable": {"thread_id": thread_id}}
-        
+
         # Re-fetch state and update messages if prompt settings changed
         state = await graph.aget_state(config)
         messages = state.values.get("messages", [])
@@ -231,36 +238,47 @@ async def update_session_settings(thread_id: str, req: UpdateSettingsRequest):
             from langchain_core.messages import SystemMessage
 
             from orchestrator_agent.prompts.prompts import get_basic_chatbot_system_prompt
+
             # Update system message content
             for msg in messages:
                 if isinstance(msg, SystemMessage):
                     new_prompt = get_basic_chatbot_system_prompt(name=session["chatbot_name"], tone=session["tone"])
                     msg.content = new_prompt
                     break
-            
-            await graph.aupdate_state(config, {
-                "messages": messages,
-                "provider": session["provider"],
-                "model": session["model"],
-                "chatbot_name": session["chatbot_name"],
-                "tone": session["tone"],
-                "date_time": session.get("date_time")
-            }, as_node="chatbot")
+
+            await graph.aupdate_state(
+                config,
+                {
+                    "messages": messages,
+                    "provider": session["provider"],
+                    "model": session["model"],
+                    "chatbot_name": session["chatbot_name"],
+                    "tone": session["tone"],
+                    "date_time": session.get("date_time"),
+                },
+                as_node="chatbot",
+            )
         else:
-            await graph.aupdate_state(config, {
-                "provider": session["provider"],
-                "model": session["model"],
-                "chatbot_name": session["chatbot_name"],
-                "tone": session["tone"],
-                "date_time": session.get("date_time")
-            }, as_node="chatbot")
-            
+            await graph.aupdate_state(
+                config,
+                {
+                    "provider": session["provider"],
+                    "model": session["model"],
+                    "chatbot_name": session["chatbot_name"],
+                    "tone": session["tone"],
+                    "date_time": session.get("date_time"),
+                },
+                as_node="chatbot",
+            )
+
         return session
     except HTTPException as he:
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("api:app", host="127.0.0.1", port=8000, reload=True)
