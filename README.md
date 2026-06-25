@@ -233,7 +233,7 @@ To initialize the hook on your local machine:
 2. **Alternative (Python/Backend Developers)**:
    If you do not have Node/NPM installed, you can manually point Git to the hook directory from the repository root:
    ```bash
-   git config core.hooksPath frontend/.husky
+   git config core.hooksPath .husky
    ```
 
 ### 3. Continuous Integration (CI/CD)

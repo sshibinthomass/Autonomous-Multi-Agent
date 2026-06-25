@@ -27,7 +27,7 @@ npm install
 ### Option B: Manual Setup (No Node/NPM Dependency)
 If you do not have Node/NPM installed, you can manually instruct Git to use the version-controlled Husky directory from the repository root:
 ```bash
-git config core.hooksPath frontend/.husky
+git config core.hooksPath .husky
 ```
 
 ---
