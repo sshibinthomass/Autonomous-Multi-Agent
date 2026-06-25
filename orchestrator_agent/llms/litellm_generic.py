@@ -57,7 +57,7 @@ def convert_messages_to_litellm(messages: List[BaseMessage]) -> List[dict]:
         else:
             role = "user"
 
-        dct = {"role": role, "content": msg.content or ""}
+        dct: dict[str, Any] = {"role": role, "content": msg.content or ""}
 
         # Parse and translate LangChain tool calls back to standard OpenAI tool calls format
         if isinstance(msg, AIMessage) and msg.tool_calls:

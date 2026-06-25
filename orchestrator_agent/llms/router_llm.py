@@ -132,7 +132,19 @@ class DynamicRouterLLM(BaseChatModel):
         user_query = ""
         for msg in reversed(messages):
             if isinstance(msg, HumanMessage):
-                user_query = msg.content
+                content = msg.content
+                if isinstance(content, str):
+                    user_query = content
+                elif isinstance(content, list):
+                    parts = []
+                    for part in content:
+                        if isinstance(part, str):
+                            parts.append(part)
+                        elif isinstance(part, dict) and "text" in part:
+                            parts.append(str(part["text"]))
+                    user_query = " ".join(parts) if parts else str(content)
+                else:
+                    user_query = str(content)
                 break
 
         if not user_query:
