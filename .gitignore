@@ -16,3 +16,8 @@ wheels/
 
 # Storage Files
 orchestrator_agent/stores/
+
+# Cache directories
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
