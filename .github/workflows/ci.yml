@@ -28,6 +28,12 @@ jobs:
     - name: Install dependencies
       run: uv sync
 
+    - name: Run Ruff check
+      run: uv run ruff check .
+
+    - name: Run Mypy check
+      run: uv run mypy .
+
     - name: Run pytest
       run: uv run pytest
 
